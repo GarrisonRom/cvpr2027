@@ -32,6 +32,18 @@ The source checkout remains separate from these payload roots. Do not put model 
 
 The Safety dataset's full LeRobot/video training payload was not downloaded; the MVP starts from the released safety-tuned checkpoint and only needs the simulator assets for evaluation.
 
+## Additional model zoo
+
+The public action-policy checkpoints listed in safety_continuity/manifests/models/open_policy_inventory.yaml are staged under the current payload root. The per-file revision/path/size manifest is safety_continuity/manifests/artifacts/additional_models.tsv, with checksums in safety_continuity/manifests/artifacts/checksums/additional_models.sha256.
+
+The staged set includes SmolVLA, OpenVLA, OpenVLA-OFT, GR00T N1.7 base and LIBERO inference weights, Xiaomi-Robotics-0 pretrain and LIBERO weights, Octo-Small/Base, RDT-1B, and the PyTorch T5-XXL plus SigLIP encoders used by RDT. The duplicate TensorFlow T5 serialization and GR00T's 16-rank optimizer-state training snapshot were not included.
+
+GR00T N1.7 requires nvidia/Cosmos-Reason2-2B at runtime. That dependency is gated and the anonymous AutoDL mirror request returned HTTP 403, so GR00T weights are present but cannot be assumed runnable until access is approved. ACT has no general pretrained checkpoint; the listed closed humanoid systems and non-action world model are cataloged as unavailable/non-comparable rather than represented by downloaded weights.
+
+## Storage headroom
+
+The payload root currently uses about 133GB of the 150GB AutoDL instance disk, leaving roughly 17GB free. The LIBERO-Safety assets remain as a verified ZIP and have not been extracted. Expand the data disk before extracting simulator assets, creating training checkpoints, or starting runs. Do not delete model/data payloads to make room without first confirming a backup or shared mount.
+
 ## Checksums
 
 Tracked per-file SHA-256 lists are under safety_continuity/manifests/artifacts/checksums/. The downloaded payloads were verified against the tracked lists. The assets ZIP also passed an archive integrity check. Do not edit or regenerate checksum lists without re-downloading or independently verifying the corresponding files.

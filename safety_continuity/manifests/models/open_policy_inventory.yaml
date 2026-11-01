@@ -1,0 +1,112 @@
+schema_version: 1
+status: downloaded_and_verified_public_artifacts
+retrieved_date: 2026-11-01
+download_manifest: safety_continuity/manifests/artifacts/additional_models.tsv
+verified_file_count: 171
+verified_total_bytes: 116563335055
+checksum_file: safety_continuity/manifests/artifacts/checksums/additional_models.sha256
+verification:
+  - every file matches its manifest size
+  - all available upstream LFS SHA-256 values match
+  - T5-v1_1-xxl PyTorch checkpoint matches upstream LFS SHA-256
+models:
+  - id: lerobot/smolvla_base
+    role: lightweight_vla
+    revision: 5e8d12a6e2975b0e5e5fce7c8caf47c371d257b6
+    license: Apache-2.0
+    relative_path: base/lerobot/smolvla_base/5e8d12a6e2975b0e5e5fce7c8caf47c371d257b6
+    status: downloaded_and_verified
+  - id: openvla/openvla-7b
+    role: classic_open_vla
+    revision: 47a0ec7fc4ec123775a391911046cf33cf9ed83f
+    license: MIT
+    relative_path: base/openvla/openvla-7b/47a0ec7fc4ec123775a391911046cf33cf9ed83f
+    status: downloaded_and_verified
+  - id: moojink/openvla-7b-oft-finetuned-libero-10
+    role: optimized_openvla_libero_checkpoint
+    revision: 95220f9a3421a7ff12d4218e73d09ade830fa9a3
+    license: MIT
+    relative_path: finetuned/openvla-oft-libero-10/95220f9a3421a7ff12d4218e73d09ade830fa9a3
+    status: downloaded_and_verified
+  - id: nvidia/GR00T-N1.7-3B
+    role: humanoid_vla_base
+    revision: 2fc962b973bccdd5d8ce4f67cc63b264d6886495
+    license: Apache-2.0-per-upstream-readme
+    relative_path: base/nvidia/GR00T-N1.7-3B/2fc962b973bccdd5d8ce4f67cc63b264d6886495
+    status: downloaded_dependency_gated
+    runtime_dependency: nvidia/Cosmos-Reason2-2B
+  - id: nvidia/GR00T-N1.7-LIBERO
+    role: humanoid_vla_libero_inference_checkpoint
+    revision: 2ea293aa20ba7cf5bbf3ba17a5fbcb1a01cbfe21
+    downloaded_subtree: libero_10/
+    included_files: 19
+    included_bytes: 6910788450
+    excluded_subtree: libero_10/global_step18000/
+    exclusion_reason: 16-rank optimizer-state shards are not needed for inference and exceed the single-GPU MVP storage budget
+    relative_path: finetuned/nvidia/GR00T-N1.7-LIBERO/2ea293aa20ba7cf5bbf3ba17a5fbcb1a01cbfe21
+    status: downloaded_inference_subtree_dependency_gated
+    runtime_dependency: nvidia/Cosmos-Reason2-2B
+  - id: XiaomiRobotics/Xiaomi-Robotics-0-Pretrain
+    role: cross_embodiment_vla_base
+    revision: 50276c277f7d5c9b1a52fcecdea79045568c6916
+    license: Apache-2.0
+    relative_path: base/XiaomiRobotics/Xiaomi-Robotics-0-Pretrain/50276c277f7d5c9b1a52fcecdea79045568c6916
+    status: downloaded_and_verified
+  - id: XiaomiRobotics/Xiaomi-Robotics-0-LIBERO
+    role: cross_embodiment_vla_libero_checkpoint
+    revision: fc04bbdcc53e498695cfad95d1199091396ef55b
+    license: Apache-2.0
+    relative_path: finetuned/XiaomiRobotics/Xiaomi-Robotics-0-LIBERO/fc04bbdcc53e498695cfad95d1199091396
+    status: downloaded_and_verified
+  - id: rail-berkeley/octo-small-1.5
+    role: generalist_policy_small
+    revision: dc9aa3019f764726c770814b27e4ab0fc6e32a58
+    license: MIT
+    relative_path: base/rail-berkeley/octo-small-1.5/dc9aa3019f764726c770814b27e4ab0fc6e32a58
+    status: downloaded_and_verified
+  - id: rail-berkeley/octo-base-1.5
+    role: generalist_policy_base
+    revision: ee3c10e8edd6ce2e8b1e8744d3c6fba4097bed48
+    license: MIT
+    relative_path: base/rail-berkeley/octo-base-1.5/ee3c10e8edd6ce2e8b1e8744d3c6fba4097bed48
+    status: downloaded_and_verified
+  - id: robotics-diffusion-transformer/rdt-1b
+    role: diffusion_robot_policy
+    revision: eb09036cc64ca4945051acbd1bd581d30a1d7711
+    license: MIT
+    relative_path: base/robotics-diffusion-transformer/rdt-1b/eb09036cc64ca4945051acbd1bd581d30a1d7711
+    status: downloaded_and_verified
+    runtime_dependencies:
+      - google/t5-v1_1-xxl-pytorch
+      - google/siglip-so400m-patch14-384
+  - id: google/t5-v1_1-xxl
+    role: rdt_text_encoder
+    revision: 3db67ab1af984cf10548a73467f0e5bca2aaaeb2
+    downloaded_files:
+      - pytorch_model.bin
+      - tokenizer_and_model_configuration
+    excluded_file: tf_model.h5
+    exclusion_reason: duplicate TensorFlow serialization of the same encoder
+    relative_path: base/google/t5-v1_1-xxl/3db67ab1af984cf10548a73467f0e5bca2aaaeb2
+    status: downloaded_and_verified
+  - id: google/siglip-so400m-patch14-384
+    role: rdt_vision_encoder
+    revision: 9fdffc58afc957d1a03a25b10dba0329ab15c2a3
+    license: Apache-2.0
+    relative_path: base/google/siglip-so400m-patch14-384/9fdffc58afc957d1a03a25b10dba0329ab15c2a3
+    status: downloaded_and_verified
+
+dependencies_not_downloaded:
+  - id: nvidia/Cosmos-Reason2-2B
+    reason: gated_access_required; current unauthenticated mirror request returns HTTP 403
+    action: request access and authenticate through Hugging Face on the cloud instance; never place tokens in this repository
+
+catalog_only:
+  - id: ACT
+    reason: no general pretrained VLA checkpoint; task-specific ACT weights must be trained from demonstrations
+  - id: Tesla Optimus / Figure Helix / X Square WALL-A
+    reason: no public research weights and training checkpoints were available
+  - id: Xiaomi-Robotics-U0
+    reason: world/scene generation model, not an action-policy checkpoint for this manipulation comparison
+  - id: SafeVLA
+    reason: object-navigation domain and action interface do not match the LIBERO manipulation experiment

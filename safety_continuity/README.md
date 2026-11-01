@@ -11,6 +11,8 @@ This folder owns experiment software and documentation for measuring safety chan
 - docs/metrics.md will define operational metrics, units, labels and aggregation.
 - docs/data_dictionary.md will define episode and per-step record schemas.
 - docs/cloud_setup.md records the current AutoDL payload mapping and checksum locations.
+- manifests/models/open_policy_inventory.yaml catalogs downloaded, gated and unavailable model candidates.
+- manifests/artifacts/additional_models.tsv pins every extra model/encoder file revision, path and expected size.
 
 ## Planned project tree
 
