@@ -1,0 +1,25 @@
+schema_version: 1
+resource_id: pi05_libero_safety
+kind: model_checkpoint
+source:
+  host: hf-mirror.com
+  repo_id: LIBERO-Safety/pi05_libero_safety
+  revision: e66d84bfec17770384550593e39975f7e21e3463
+  revision_date_utc: 2026-03-19T08:16:50Z
+  public: true
+  gated: false
+expected_snapshot:
+  file_count: 29
+  total_bytes: 12440507736
+  checkpoint_format: openpi_ocdbt
+  file_manifest: safety_continuity/manifests/artifacts/mvp_artifacts.tsv
+  checksum_file: safety_continuity/manifests/artifacts/checksums/pi05_libero_safety.sha256
+storage:
+  root_env: SC_MODEL_ROOT
+  relative_path: finetuned/pi05_libero_safety/e66d84bfec17770384550593e39975f7e21e3463
+status: downloaded_and_verified
+verified_date: 2026-11-01
+notes:
+  - This is a safety-finetuned pi0.5 checkpoint, not the generic pi05_libero checkpoint.
+  - Verify loader compatibility and checkpoint training-data exposure before scientific evaluation.
+  - Do not commit model payloads.

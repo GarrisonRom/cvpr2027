@@ -1,0 +1,17 @@
+schema_version: 1
+status: draft
+dataset_id: modified_libero_rlds_libero10_no_noops
+manifest: safety_continuity/manifests/datasets/libero10_modified_libero_rlds.yaml
+subset: libero_10_no_noops/1.0.0
+format: rlds_tfrecord
+root_env: SC_DATA_ROOT
+relative_path: raw/modified_libero_rlds/6ce6aaaaabdbe590b1eef5cd29c0d33f14a08551
+conversion:
+  target_format: pinned_openpi_compatible_format
+  implementation: safety_continuity.src.safety_continuity.data
+  preserve_episode_ids: true
+  emit_sample_manifest: true
+splits:
+  update_manifest: safety_continuity/manifests/experiments/mvp_update_samples.jsonl
+  evaluation_task_ids: libero10_official
+  prohibit_update_eval_overlap: true

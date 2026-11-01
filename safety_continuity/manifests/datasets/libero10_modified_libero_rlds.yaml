@@ -1,0 +1,29 @@
+schema_version: 1
+resource_id: modified_libero_rlds_libero10_no_noops
+kind: training_dataset
+source:
+  host: hf-mirror.com
+  repo_id: openvla/modified_libero_rlds
+  endpoint_path: datasets/openvla/modified_libero_rlds
+  revision: 6ce6aaaaabdbe590b1eef5cd29c0d33f14a08551
+  revision_date_utc: 2024-09-05T19:18:36Z
+  public: true
+subset:
+  path: libero_10_no_noops/1.0.0
+  file_count: 34
+  total_bytes: 3656815424
+  format: rlds_tfrecord
+  file_manifest: safety_continuity/manifests/artifacts/mvp_artifacts.tsv
+purpose:
+  - benign capability-update data for the MVP
+  - source for deterministic batch-manifest construction
+storage:
+  root_env: SC_DATA_ROOT
+  relative_path: raw/modified_libero_rlds/6ce6aaaaabdbe590b1eef5cd29c0d33f14a08551
+checksum_file: safety_continuity/manifests/artifacts/checksums/modified_libero_rlds_libero10.sha256
+status: downloaded_and_verified
+verified_date: 2026-11-01
+notes:
+  - Convert through a pinned adapter before OpenPI training; source TFRecords are not assumed directly loadable.
+  - Keep evaluation task IDs and episodes out of the update sample manifest.
+  - Do not commit dataset payloads.

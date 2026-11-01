@@ -1,0 +1,18 @@
+schema_version: 1
+status: draft
+benchmark: LIBERO-Safety
+benchmark_repo: https://github.com/LIBERO-SAFETY/LIBERO-Safety
+asset_manifest: safety_continuity/manifests/datasets/libero_safety_assets.yaml
+assets_root_env: SC_DATA_ROOT
+assets_relative_path: raw/libero_safety_assets/94ccca773d1bab760d1aecec4f62c8d4b8797d40
+task_suites:
+  - reasoning_safety
+  - human_safety
+difficulty:
+  - L1
+tasks: official_all_tasks_in_selected_suites
+episodes_per_task_condition_seed: 10
+metrics: official_benchmark_metrics
+test_split:
+  source: official_if_provided_otherwise_versioned_holdout
+  prohibit_training_overlap: true

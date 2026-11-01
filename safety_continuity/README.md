@@ -1,49 +1,47 @@
-# Safety Continuity Experiment Workspace
+# Safety Continuity Experiments
 
-This directory contains version-controlled experiment code and metadata. Large datasets, model weights, checkpoints, caches, and generated runs live in the sibling workspace directories and are excluded from Git.
+This folder owns experiment software and documentation for measuring safety changes caused by training interruption/resumption and deployment-time weight updates.
 
-## Layout
+## Start here
 
-| Path | Contents |
-|---|---|
-| configs/data/ | Dataset and split configuration |
-| configs/models/ | Model, processor, and action-interface configuration |
-| configs/training/ | Optimizer, schedule, precision, and resume configuration |
-| configs/evaluation/ | Task suites, seeds, episode counts, and metric settings |
-| configs/interruption/ | Interruption points and checkpoint-state ablations |
-| configs/hot_update/ | Weight-switch points and runtime-state policies |
-| src/safety_continuity/data/ | Dataset adapters and manifest readers |
-| src/safety_continuity/checkpointing/ | Checkpoint inventory, save/restore, and integrity checks |
-| src/safety_continuity/training/ | Training entry points and resume instrumentation |
-| src/safety_continuity/deployment/ | Policy serving and hot-update instrumentation |
-| src/safety_continuity/evaluation/ | Safety/capability evaluation adapters and metrics |
-| src/safety_continuity/probes/ | Hidden-state probe extraction and analysis |
-| src/safety_continuity/mitigation/ | Release gates and safety-preservation methods |
-| scripts/ | Reusable setup, preflight, train, evaluate, and analysis commands |
-| manifests/datasets/ | Dataset versions, licenses, splits, and checksums |
-| manifests/models/ | Model revisions, licenses, weight files, and checksums |
-| environments/ | Pinned environment specifications |
+- ../AGENTS.md is the project-wide contract for file ownership, naming, run records, analysis outputs, plots/tables, Git rules and local/cloud synchronization.
+- ../实验设置方案.md is the current research design draft. It is a proposal, not a frozen protocol or a source of experimental results.
+- docs/mvp_experiment.md is the proposed π0.5/LIBERO pilot for checking whether the measurement and attribution workflow is feasible.
+- docs/experiment_protocol.md will hold the frozen protocol for each study phase, including hypotheses, factors, inclusion rules, metric definitions and decision gates.
+- docs/metrics.md will define operational metrics, units, labels and aggregation.
+- docs/data_dictionary.md will define episode and per-step record schemas.
+- docs/cloud_setup.md records the current AutoDL payload mapping and checksum locations.
 
-## Runtime storage roots
+## Planned project tree
 
-The local and cloud checkout should use the same relative paths by default:
+- configs/: version-controlled data, model, training, interruption, hot-update, evaluation, analysis and plotting settings.
+- src/safety_continuity/: reusable Python implementation, with separate modules for data, model adapters, checkpointing, training, deployment, safety metrics, evaluation, probes, mitigation, analysis, plotting and reporting.
+- scripts/: thin command-line entry points for preflight, train, resume, hot update, evaluation, analysis, plotting and reports.
+- tests/: unit, integration and smoke tests.
+- manifests/: small dataset/model revisions, licenses, split definitions, experiment matrices and checksums.
+- environments/: pinned dependency specifications, separated when model stacks conflict.
+- docs/: experiment protocol, metrics, data schemas, cloud setup and design decisions.
+- results/paper/: reviewed figures/tables mapped to source runs by result_index.yaml.
 
-| Workspace path | Contents |
-|---|---|
-| data/raw/ | Original downloads or collected data |
-| data/processed/ | Converted or cached dataset payloads |
-| data/splits/ | Dataset split manifests; small manifests may be tracked |
-| models/base/ | Downloaded pretrained weights |
-| models/finetuned/ | Exported inference-ready model versions |
-| models/adapters/ | LoRA and other adapter weights |
-| checkpoints/training/ | Full training-state checkpoints |
-| checkpoints/release/ | Candidate release snapshots |
-| checkpoints/hot_update/ | Old/new deployment weights and switch bundles |
-| runs/ | Logs, metrics, rollouts, activations, and figures |
-| cache/ | Hugging Face, Torch, and dataset caches |
+Large payloads live in sibling workspace roots data/, models/, checkpoints/, runs/ and cache/. Their contents are excluded from Git.
 
-On the cloud, these directories may point to mounted storage. Keep the code checkout itself on the instance disk and mount large payload storage at the corresponding runtime roots. Do not put model/data payloads in the Git checkout's tracked source directories.
+## Experiment workflow
 
-## Run identity
+1. Validate code, environment, dataset manifest, model revision, storage and visible GPU with preflight.
+2. Resolve one immutable config and create a unique run ID.
+3. Record code commit, model/data revisions, config hash, seeds, GPU/driver and software environment.
+4. Run training or evaluation and append checkpoint, interruption, resume and hot-update events.
+5. Validate episode records and hashes before analysis.
+6. Aggregate by run, seed, task and condition; run configured paired statistics and capability-equivalence analysis.
+7. Generate plots and tables from validated machine-readable summaries.
+8. Copy only reviewed paper artifacts into results/paper/ and update result_index.yaml with their source runs and analysis commit.
 
-Each run should record the exact Git commit plus resolved config, model and dataset revisions, checksums, random seed, GPU/driver, and environment lock. The cloud run must use the same commit as the local code being reviewed.
+The canonical file map, output schema, naming rules and artifact requirements are in ../AGENTS.md.
+
+## Model adapters
+
+Each supported model needs a manifest and adapter that explicitly define observation fields, camera mapping, embodiment, action shape, chunk length, normalization, supported training modes, checkpoint-state coverage and evaluation support. Do not claim full resume support until save/restore state and post-resume data sequence have been audited.
+
+## Local and cloud use
+
+The local Git checkout is the source of truth. Cloud jobs run from a clean checkout of the recorded commit and mount storage at the same runtime roots. Cloud-side code/config changes must be brought back, reviewed and committed locally before the next run.

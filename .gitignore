@@ -27,18 +27,9 @@ __pycache__/
 !/checkpoints/release/.gitkeep
 /checkpoints/hot_update/*
 !/checkpoints/hot_update/.gitkeep
-/runs/logs/*
-!/runs/logs/.gitkeep
-/runs/evaluation/*
-!/runs/evaluation/.gitkeep
-/runs/rollouts/*
-!/runs/rollouts/.gitkeep
-/runs/activations/*
-!/runs/activations/.gitkeep
-/runs/metrics/*
-!/runs/metrics/.gitkeep
-/runs/figures/*
-!/runs/figures/.gitkeep
+# Per-run outputs are disposable runtime data; keep only the root marker.
+/runs/*
+!/runs/.gitkeep
 /cache/huggingface/*
 !/cache/huggingface/.gitkeep
 /cache/torch/*

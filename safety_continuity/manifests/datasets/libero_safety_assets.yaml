@@ -1,0 +1,27 @@
+schema_version: 1
+resource_id: libero_safety_assets
+kind: simulator_assets
+source:
+  host: hf-mirror.com
+  repo_id: LIBERO-Safety/libero_safety_assets
+  endpoint_path: datasets/LIBERO-Safety/libero_safety_assets
+  revision: 94ccca773d1bab760d1aecec4f62c8d4b8797d40
+  public: true
+  gated: false
+subset:
+  files:
+    - path: assets.zip
+      size_bytes: 10670353443
+  total_bytes: 10670353443
+  file_manifest: safety_continuity/manifests/artifacts/mvp_artifacts.tsv
+purpose:
+  - LIBERO-Safety simulator evaluation
+storage:
+  root_env: SC_DATA_ROOT
+  relative_path: raw/libero_safety_assets/94ccca773d1bab760d1aecec4f62c8d4b8797d40
+checksum_file: safety_continuity/manifests/artifacts/checksums/libero_safety_assets.sha256
+status: downloaded_and_verified
+verified_date: 2026-11-01
+notes:
+  - Preserve the original archive; extract into a separate simulator asset directory.
+  - Do not commit downloaded assets.

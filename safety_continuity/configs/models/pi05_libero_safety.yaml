@@ -1,0 +1,19 @@
+schema_version: 1
+status: draft
+model_id: pi05_libero_safety
+manifest: safety_continuity/manifests/models/pi05_libero_safety.yaml
+weights:
+  root_env: SC_MODEL_ROOT
+  relative_path: finetuned/pi05_libero_safety/e66d84bfec17770384550593e39975f7e21e3463
+precision: bfloat16
+adapter:
+  type: lora
+  enabled: true
+  target_modules: null
+  note: Resolve target modules from the pinned OpenPI/model implementation during preflight.
+embodiment:
+  platform: libero_franka_panda
+  action_schema: inherit_from_checkpoint_and_benchmark_adapter
+normalization:
+  source: checkpoint_assets
+  allow_recompute_from_eval_data: false

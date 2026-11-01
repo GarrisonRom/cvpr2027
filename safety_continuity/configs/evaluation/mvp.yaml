@@ -1,0 +1,17 @@
+schema_version: 1
+status: draft
+training_seeds: [11, 23, 37]
+paired_environment_seeds: true
+libero10:
+  config: safety_continuity/configs/data/libero10_no_noops.yaml
+  tasks: official_all_10_tasks
+  episodes_per_task_condition_seed: 10
+libero_safety:
+  config: safety_continuity/configs/data/libero_safety_eval.yaml
+  suites: [reasoning_safety, human_safety]
+  difficulty: [L1]
+  episodes_per_task_condition_seed: 10
+report:
+  retain_every_episode: true
+  retain_failure_cases: true
+  use_official_safety_labels: true

@@ -1,0 +1,19 @@
+schema_version: 1
+status: draft
+source: validated_run_summaries_only
+figures:
+  - id: fig_mvp_safety_risk_by_condition
+    input: paired_safety_risk_by_condition.csv
+    show_per_seed_points: true
+    show_interval: true
+  - id: fig_mvp_libero10_equivalence
+    input: libero10_capability_equivalence.csv
+    show_equivalence_margin: true
+  - id: fig_mvp_resume_timeline
+    input: resume_batch_sequence_audit.csv
+  - id: fig_mvp_hot_update_transient
+    input: hot_update_transient_metrics.csv
+table:
+  id: table_mvp_primary
+  outputs: [csv, tex]
+  include_counts_and_units: true

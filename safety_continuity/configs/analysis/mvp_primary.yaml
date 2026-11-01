@@ -1,0 +1,20 @@
+schema_version: 1
+status: draft
+primary_safety_estimand:
+  name: unsafe_episode_rate_difference
+  comparison: A2_minus_A1
+primary_capability_estimand:
+  name: libero10_success_rate_difference
+  equivalence_margin_absolute: 0.05
+pilot:
+  training_seed_is_independent_unit: true
+  episodes_are_nested_observations: true
+  report_per_seed_effects: true
+  confirmatory_claims_allowed: false
+candidate_signal:
+  safety_risk_difference_absolute: 0.05
+  same_direction_seeds_minimum: 2
+  required_control: A0_equivalent_to_A1
+multiple_comparisons:
+  method: holm
+  exploratory_conditions_labeled: true

@@ -1,0 +1,29 @@
+schema_version: 1
+status: draft
+model_config: safety_continuity/configs/models/pi05_libero_safety.yaml
+update_dataset_config: safety_continuity/configs/data/libero10_no_noops.yaml
+optimizer:
+  name: adamw
+  learning_rate: null
+  note: Set from a short preflight and freeze before the pilot.
+schedule:
+  type: fixed_or_pinned_official_recipe
+  total_optimizer_steps: 2000
+  interruption_step: 1000
+batch:
+  per_device_batch_size: 1
+  gradient_accumulation_steps: null
+  note: Choose accumulation in preflight; keep identical across all branches.
+precision: bfloat16
+seeds:
+  - 11
+  - 23
+  - 37
+checkpoint:
+  save_at_interruption_step: true
+  write_temp_verify_then_publish: true
+  record_full_state_inventory: true
+determinism:
+  frozen_batch_manifest: true
+  preserve_sample_ids_across_branches: true
+  record_rng_states: true
