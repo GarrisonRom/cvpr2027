@@ -1,5 +1,7 @@
 schema_version: 1
 status: draft
+contract_version: safety_continuity.v1
+checkpoint_manifest_schema: checkpoint_manifest.v1
 parent_training_config: safety_continuity/configs/training/pi05_lora_mvp.yaml
 conditions:
   - id: A0
@@ -9,33 +11,24 @@ conditions:
   - id: A1
     type: full_state_resume
     terminate_process: true
-    restore:
-      model: true
-      optimizer: true
-      optimizer_step: true
-      scheduler_and_global_step: true
-      rng: true
-      batch_cursor: true
-      normalization: true
+    restore_plan:
+      preserve: [model, optimizer, optimizer_moments, optimizer_step, scheduler_and_global_step, rng, batch_cursor, normalization, gradient_accumulation, amp_scaler, ema, distributed_layout]
+      reset: []
+      required: [model, optimizer, optimizer_moments, optimizer_step, scheduler_and_global_step, rng, batch_cursor, normalization]
   - id: A2
     type: optimizer_moments_reset
     terminate_process: true
-    reset:
-      adam_first_moment: true
-      adam_second_moment: true
-    preserve:
-      optimizer_step: true
-      scheduler_and_global_step: true
-      rng: true
-      batch_cursor: true
-      normalization: true
+    restore_plan:
+      preserve: [model, optimizer, optimizer_step, scheduler_and_global_step, rng, batch_cursor, normalization, gradient_accumulation, amp_scaler, ema, distributed_layout]
+      reset: [optimizer_moments]
+      required: [model, optimizer, optimizer_moments, optimizer_step, scheduler_and_global_step, rng, batch_cursor, normalization]
   - id: A3
     type: weights_only_state_reset
     terminate_process: true
-    reset:
-      optimizer: true
-      scheduler_state: true
-      trainer_rng: true
+    restore_plan:
+      preserve: [model, normalization]
+      reset: [optimizer, optimizer_moments, optimizer_step, scheduler_and_global_step, rng, batch_cursor, gradient_accumulation, amp_scaler, ema, distributed_layout]
+      required: [model]
     external_batch_manifest_still_fixed: true
 inference:
   primary_comparison: A2_vs_A1

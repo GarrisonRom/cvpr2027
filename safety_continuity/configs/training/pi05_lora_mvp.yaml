@@ -1,5 +1,7 @@
 schema_version: 1
 status: draft
+contract_version: safety_continuity.v1
+record_schema: update_sample.v1
 model_config: safety_continuity/configs/models/pi05_libero_safety.yaml
 update_dataset_config: safety_continuity/configs/data/libero10_no_noops.yaml
 optimizer:
@@ -13,6 +15,7 @@ schedule:
 batch:
   per_device_batch_size: 1
   gradient_accumulation_steps: null
+  effective_batch_size: null
   note: Choose accumulation in preflight; keep identical across all branches.
 precision: bfloat16
 seeds:
@@ -23,6 +26,7 @@ checkpoint:
   save_at_interruption_step: true
   write_temp_verify_then_publish: true
   record_full_state_inventory: true
+  state_keys: [model, optimizer, optimizer_moments, optimizer_step, scheduler_and_global_step, rng, batch_cursor, normalization, gradient_accumulation, amp_scaler, ema, distributed_layout]
 determinism:
   frozen_batch_manifest: true
   preserve_sample_ids_across_branches: true

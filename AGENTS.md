@@ -141,8 +141,9 @@ Runtime payloads are ignored by Git except .gitkeep markers and deliberately tra
 - Every run contains metadata/resolved_config.yaml, metadata/provenance.json and, where applicable, metadata/checkpoint_manifest.json, plus logs and a machine-readable summary.
 - provenance.json records Git commit and dirty status, config hash, model/processor revision, dataset manifest/hash, split ID, seed, GPU name/visible memory, driver, Python/framework/CUDA packages, simulator version and start/end times.
 - checkpoint_manifest.json lists included state items, shard paths, sizes, hashes, global step, save completion and restore compatibility. Missing state is explicit.
+- Training runs store metadata/batch_manifest.json with the immutable split path/hash, dataset revision, seed and optimizer horizon; events/batch_consumption.jsonl records every consumed sample in order.
 - Append events to checkpoint_events.jsonl, interruption_events.jsonl, resume_events.jsonl and hot_update_events.jsonl. Each record contains run ID and UTC timestamp.
-- Store episode data as episodes/episodes.jsonl or Parquet, one record per episode. Stable fields include run/model/condition, task, scene, instruction ID/type, initial-state seed, model version, success, safe/unsafe outcome, violation type, safety cost, exposure duration, completion time and termination reason.
+- Store episode data as episodes/episodes.jsonl or Parquet, one record per episode. Stable fields include run/model/condition, benchmark/suite, task, scene, instruction ID/type, training/evaluation/initial-state seeds, model version, success, safe/unsafe outcome, violation type, safety cost, exposure duration, completion time and termination reason.
 - Store step-level traces separately under episodes/step_traces/ as compressed Parquet/JSONL. Include timestep, action, monitor margins, active policy version and simulator-state reference.
 - metrics/summary.json is the canonical run aggregate. metrics/episode_metrics.csv is the inspectable flat export. Include sample counts, exclusions, interval estimates, units and metric definitions.
 - Never overwrite a completed run. A rerun receives a new ID and records any parent run.
@@ -167,7 +168,7 @@ Runtime payloads are ignored by Git except .gitkeep markers and deliberately tra
 - Cloud jobs run from a clean checkout of the exact commit recorded in provenance.json.
 - Do not make uncommitted code/config edits directly on cloud. Bring changes to local, review, commit, then sync a new revision.
 - Use identical relative layout locally and in the cloud. Configure roots through environment variables or ignored local .env; never hard-code machine-specific absolute paths.
-- Recommended roots: SC_DATA_ROOT, SC_MODEL_ROOT, SC_CHECKPOINT_ROOT, SC_RUN_ROOT and SC_CACHE_ROOT. Defaults point to the workspace runtime directories.
+- Recommended roots: SC_DATA_ROOT, SC_SPLIT_ROOT, SC_MODEL_ROOT, SC_CHECKPOINT_ROOT, SC_RUN_ROOT and SC_CACHE_ROOT. Defaults point to the workspace runtime directories; SC_SPLIT_ROOT defaults to data/splits.
 - Keep the code checkout on instance storage and mount large storage at data/model/checkpoint/run/cache roots. Never mount a data volume over code.
 - Before long runs, execute preflight and verify free disk, visible GPU memory, framework GPU access, model load, data manifest and output write access.
 
@@ -175,7 +176,7 @@ Runtime payloads are ignored by Git except .gitkeep markers and deliberately tra
 
 - Keep raw datasets immutable. Track revision, license, split definition, source and checksum under manifests/datasets/.
 - Track model revision, license/access requirements, processor/action schema, weight file list and checksum under manifests/models/. Weights never go into Git.
-- Record checkpoint state when applicable: model/adapter, optimizer, scheduler/global step, Python/NumPy/CPU/GPU RNG, sampler/data cursor, gradient accumulation, AMP scaler, EMA, normalization and distributed layout.
+- Record checkpoint state when applicable: model/adapter, optimizer structure, optimizer moments, scheduler/global step, Python/NumPy/CPU/GPU RNG, sampler/data cursor, gradient accumulation, AMP scaler, EMA, normalization and distributed layout.
 - Write checkpoints to a temporary path, verify shards and checksums, then publish atomically when supported.
 - A weights-only checkpoint is named and reported as weights-only, never full training resume.
 - Record model, environment, data-order and evaluation initial-state seeds separately.

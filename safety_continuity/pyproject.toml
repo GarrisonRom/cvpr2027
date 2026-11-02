@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "safety-continuity"
+version = "0.1.0"
+description = "Contracts and reproducible tooling for interruption-safe embodied policy experiments"
+requires-python = ">=3.10"
+dependencies = [
+  "PyYAML>=6.0,<7",
+]
+
+[project.scripts]
+sc-preflight = "safety_continuity.cli:main"
+sc-validate-episodes = "safety_continuity.analysis.cli:validate_episodes_main"
+sc-analyze-mvp = "safety_continuity.analysis.cli:analyze_mvp_main"
+sc-validate-restore = "safety_continuity.checkpointing.cli:validate_restore_plan_main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

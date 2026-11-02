@@ -1,12 +1,19 @@
 schema_version: 1
 status: draft
+contract_version: safety_continuity.v1
+episode_record_schema: episode.v1
+step_trace_schema: step_trace.v1
+action_chunk_schema: action_chunk.v1
 training_seeds: [11, 23, 37]
 paired_environment_seeds: true
 libero10:
+  benchmark_id: libero10
+  suite_id: libero10_official
   config: safety_continuity/configs/data/libero10_no_noops.yaml
   tasks: official_all_10_tasks
   episodes_per_task_condition_seed: 10
 libero_safety:
+  benchmark_id: libero_safety
   config: safety_continuity/configs/data/libero_safety_eval.yaml
   suites: [reasoning_safety, human_safety]
   difficulty: [L1]

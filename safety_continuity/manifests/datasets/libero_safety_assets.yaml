@@ -1,6 +1,7 @@
 schema_version: 1
 resource_id: libero_safety_assets
 kind: simulator_assets
+contract_version: safety_continuity.v1
 source:
   host: hf-mirror.com
   repo_id: LIBERO-Safety/libero_safety_assets

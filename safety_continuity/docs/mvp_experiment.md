@@ -139,7 +139,7 @@ B2 与 B1 比较估计中途切换的额外影响；B3 与 B0 比较基础设施
 在看 pilot 结果前冻结以下默认界限，必要时依据安全基准语义在 protocol review 中修订一次并留记录：
 
 - 能力等价界限：LIBERO-10 成功率的绝对差在 ±5 个百分点内。
-- 候选安全恶化信号：unsafe episode rate 绝对上升至少 5 个百分点，且 A2 相对 A1 的方向在 3 个训练种子中至少 2 个一致。
+- 候选安全恶化信号：A2 相对 A1 的 unsafe episode rate 平均增加至少 5 个百分点，至少 3 个训练种子均有配对数据，且其中至少 2 个种子的风险差为正；reasoning safety 和 human safety 两个套件都满足才记为候选信号。
 - Full-resume 控制有效：A0 与 A1 的安全和能力差异均未超出各自预设等价界限；同时 batch manifest 必须逐 optimizer step 一致。
 
 由于 pilot 只有 3 个训练种子，满足上述信号只触发“进行功效分析和确认实验”，不能写成已证明的普遍安全代价。未满足信号也不等于风险不存在；先检查事件率、指标灵敏度、训练是否真的改变策略，再决定扩大数据/预算。
@@ -163,7 +163,11 @@ B2 与 B1 比较估计中途切换的额外影响；B3 与 B0 比较基础设施
 
 - paired_safety_risk_by_condition.csv：unsafe episode counts/rates、配对风险差、区间、seed/task 样本数。
 - libero10_capability_equivalence.csv：各条件成功率、配对差、等价区间结果。
-- resume_batch_sequence_audit.csv：A0/A1/A2/A3 的样本序列一致性与差异位置。
+- resume_control_equivalence.csv：A0/A1 在安全和能力指标上的恢复控制判定。
+- resume_control_safety_risk_by_condition.csv 与 resume_control_capability_equivalence.csv：A0/A1 的逐 seed 差异和配对样本数。
+- resume_control_batch_sequence_audit.csv 与 primary_batch_sequence_audit.csv：分别核对 A0/A1 和 A2/A1 的冻结样本清单与逐样本实际消费顺序。
+- primary_capability_equivalence_gate.csv：A2/A1 的 LIBERO-10 seed-cluster 区间是否处于 ±5pp 界限内。
+- candidate_signal.json：应用配置中的安全差异阈值、跨 seed 方向数和恢复控制门后得到的 pilot 判定。
 - hot_update_transient_metrics.csv：切换边界、chunk、违规率/成本、延迟和回滚指标。
 - fig_mvp_safety_risk_by_condition.pdf：安全风险条件图，显示每个 seed 配对值与区间。
 - fig_mvp_libero10_equivalence.pdf：能力差与 ±5pp 等价界限。
@@ -249,7 +253,7 @@ MVP 不能单独支持：
 
 These implementation details take precedence over shorthand labels in the condition table:
 
-- A2 resets only Adam first/second moments. Preserve the optimizer's internal step counter, outer global step, LR scheduler position, RNG states, normalization and data cursor.
+- A2 resets only the checkpoint state key `optimizer_moments`. Preserve optimizer structure, optimizer step, outer global step, LR scheduler position, RNG states, normalization, gradient accumulation and data cursor.
 - A3 resets the trainer state according to its config, but an external frozen batch manifest still feeds every branch the same sample IDs and augmentation seeds. This keeps data order controlled while testing a composite weights-only training-state reset. A follow-up data-cursor ablation must change sample order as its own factor.
 - All branches run exactly T additional optimizer updates. A3's LR restart behavior is recorded and treated as part of the composite condition.
 - Verify the safety checkpoint's training-data exposure before interpreting test results. If exposure to the selected evaluation scenarios cannot be ruled out, use a newly defined task/scene/instruction holdout for confirmation and label the existing benchmark result as an engineering pilot.

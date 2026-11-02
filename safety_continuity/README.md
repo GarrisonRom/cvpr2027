@@ -7,10 +7,12 @@ This folder owns experiment software and documentation for measuring safety chan
 - ../AGENTS.md is the project-wide contract for file ownership, naming, run records, analysis outputs, plots/tables, Git rules and local/cloud synchronization.
 - ../实验设置方案.md is the current research design draft. It is a proposal, not a frozen protocol or a source of experimental results.
 - docs/mvp_experiment.md is the proposed π0.5/LIBERO pilot for checking whether the measurement and attribution workflow is feasible.
-- docs/experiment_protocol.md will hold the frozen protocol for each study phase, including hypotheses, factors, inclusion rules, metric definitions and decision gates.
-- docs/metrics.md will define operational metrics, units, labels and aggregation.
-- docs/data_dictionary.md will define episode and per-step record schemas.
+- docs/experiment_protocol.md defines protocol states, promotion gates and the frozen protocol manifest.
+- docs/metrics.md defines operational metrics, units, labels and aggregation.
+- docs/data_dictionary.md defines episode and per-step record schemas.
 - docs/cloud_setup.md records the current AutoDL payload mapping and checksum locations.
+- docs/interface_contract.md freezes the boundaries between configs, adapters,
+  checkpoints, evaluation records and analysis.
 - manifests/models/open_policy_inventory.yaml catalogs downloaded, gated and unavailable model candidates.
 - manifests/artifacts/additional_models.tsv pins every extra model/encoder file revision, path and expected size.
 
@@ -39,6 +41,55 @@ Large payloads live in sibling workspace roots data/, models/, checkpoints/, run
 8. Copy only reviewed paper artifacts into results/paper/ and update result_index.yaml with their source runs and analysis commit.
 
 The canonical file map, output schema, naming rules and artifact requirements are in ../AGENTS.md.
+
+## Local preflight
+
+Install the contract layer from the repository root:
+
+    python -m pip install -e safety_continuity
+
+Run the configuration check from the repository root:
+
+    python safety_continuity/scripts/preflight/check_contracts.py
+
+Use `--strict` after adapter camera/action fields, LoRA targets, optimizer/batch
+settings and the update split manifest have all been resolved:
+
+    python -m safety_continuity.cli --workspace-root . --strict
+
+The check validates YAML schema versions, tracked references and root-safe
+runtime paths. Warnings for unresolved model fields or a not-yet-created split
+manifest are expected while the GPU-specific adapter inspection is pending. An
+experiment launch must not proceed while the preflight reports an error.
+
+Validate a saved checkpoint inventory against one configured resume condition:
+
+    python safety_continuity/scripts/resume/validate_restore_plan.py --checkpoint-manifest runs/20261102_mvp_pi05_a2_s11/metadata/checkpoint_manifest.json --checkpoint-root checkpoints/training/20261102_mvp_pi05_a2_s11/1000 --condition A2
+
+State file paths are resolved relative to `--checkpoint-root`, which points to
+the actual checkpoint payload directory (not the run metadata directory).
+
+## Episode validation and MVP analysis
+
+Validate completed runs by listing each run id explicitly:
+
+    python safety_continuity/scripts/analyze/validate_episodes.py --run-id 20261102_mvp_pi05_a1_s11
+
+Generate the default paired A2-versus-A1 analysis by listing all three-seed runs
+for A0, A1 and A2 (each run should contain the configured LIBERO-10 and safety
+benchmark episodes). A0 and A1 are required for the resume-control gate:
+
+    python safety_continuity/scripts/analyze/analyze_mvp.py --run-id 20261102_mvp_pi05_a0_s11 --run-id 20261102_mvp_pi05_a0_s23 --run-id 20261102_mvp_pi05_a0_s37 --run-id 20261102_mvp_pi05_a1_s11 --run-id 20261102_mvp_pi05_a1_s23 --run-id 20261102_mvp_pi05_a1_s37 --run-id 20261102_mvp_pi05_a2_s11 --run-id 20261102_mvp_pi05_a2_s23 --run-id 20261102_mvp_pi05_a2_s37 --analysis-id 20261102_analysis_mvp_primary_s00
+
+The analysis writes a new, immutable directory under `runs/<analysis_id>/` with
+source hashes, run summaries, seed-level paired effects, and pilot bootstrap
+intervals. It also verifies the frozen and actually consumed batch sequence for
+A0/A1 and A2/A1, evaluates the configured A0/A1 safety/capability control, and
+checks the primary LIBERO-10 capability interval against its equivalence margin.
+The primary signal is supported only when the safety threshold, batch audits,
+capability gate and A0/A1 control all pass. It checks completed-run provenance
+and the resolved-config hash, and refuses to reuse an existing analysis id. The
+pilot screens are descriptive and are not formal equivalence tests.
 
 ## Model adapters
 

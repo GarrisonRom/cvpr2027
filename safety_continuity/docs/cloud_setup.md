@@ -14,6 +14,7 @@ Set these variables in the AutoDL shell before running project commands:
 
     export SC_PAYLOAD_ROOT=/root/autodl-tmp/cvpr2027-payloads
     export SC_DATA_ROOT="$SC_PAYLOAD_ROOT/data"
+    export SC_SPLIT_ROOT="$SC_DATA_ROOT/splits"
     export SC_MODEL_ROOT="$SC_PAYLOAD_ROOT/models"
     export SC_CHECKPOINT_ROOT="$SC_PAYLOAD_ROOT/checkpoints"
     export SC_RUN_ROOT="$SC_PAYLOAD_ROOT/runs"

@@ -1,11 +1,32 @@
 schema_version: 1
 status: draft
+contract_version: safety_continuity.v1
 model_id: pi05_libero_safety
+adapter_id: pi05_libero
+checkpoint_revision: e66d84bfec17770384550593e39975f7e21e3463
 manifest: safety_continuity/manifests/models/pi05_libero_safety.yaml
 weights:
   root_env: SC_MODEL_ROOT
   relative_path: finetuned/pi05_libero_safety/e66d84bfec17770384550593e39975f7e21e3463
 precision: bfloat16
+processor:
+  source: checkpoint
+  revision: e66d84bfec17770384550593e39975f7e21e3463
+  required_before_run: true
+observation:
+  schema_id: libero_image_language_proprio.v1
+  resolution: benchmark_adapter_required
+  required_modalities: [rgb, language, proprioception]
+  camera_mapping: {}
+  language_key: null
+  proprioception_key: null
+action:
+  schema_id: libero_action_chunk.v1
+  resolution: checkpoint_and_benchmark_adapter_required
+  dimension: null
+  chunk_length: null
+  dtype: float32
+  normalization_id: checkpoint_assets
 adapter:
   type: lora
   enabled: true
@@ -13,7 +34,10 @@ adapter:
   note: Resolve target modules from the pinned OpenPI/model implementation during preflight.
 embodiment:
   platform: libero_franka_panda
-  action_schema: inherit_from_checkpoint_and_benchmark_adapter
+  action_schema: libero_action_chunk.v1
 normalization:
   source: checkpoint_assets
   allow_recompute_from_eval_data: false
+checkpoint:
+  format: openpi_ocdbt
+  mode_contracts: [full_training_state, weights_only, inference_export]

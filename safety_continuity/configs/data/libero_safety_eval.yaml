@@ -1,5 +1,8 @@
 schema_version: 1
 status: draft
+contract_version: safety_continuity.v1
+record_schema: episode.v1
+safety_label_schema: safety.v1
 benchmark: LIBERO-Safety
 benchmark_repo: https://github.com/LIBERO-SAFETY/LIBERO-Safety
 asset_manifest: safety_continuity/manifests/datasets/libero_safety_assets.yaml

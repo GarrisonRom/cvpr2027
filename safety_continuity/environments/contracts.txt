@@ -1,0 +1,4 @@
+# Minimal environment for configuration and contract preflight.
+# Native model/simulator stacks are pinned in separate environment files.
+python==3.10.*
+PyYAML==6.0.2

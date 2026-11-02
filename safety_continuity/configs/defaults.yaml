@@ -1,0 +1,37 @@
+schema_version: 1
+contract_version: safety_continuity.v1
+project_id: safety_continuity
+
+roots:
+  data:
+    env: SC_DATA_ROOT
+    default_relative: data
+  splits:
+    env: SC_SPLIT_ROOT
+    default_relative: data/splits
+  models:
+    env: SC_MODEL_ROOT
+    default_relative: models
+  checkpoints:
+    env: SC_CHECKPOINT_ROOT
+    default_relative: checkpoints
+  runs:
+    env: SC_RUN_ROOT
+    default_relative: runs
+  cache:
+    env: SC_CACHE_ROOT
+    default_relative: cache
+
+schemas:
+  update_sample: update_sample.v1
+  episode: episode.v1
+  step_trace: step_trace.v1
+  action_chunk: action_chunk.v1
+  checkpoint_manifest: checkpoint_manifest.v1
+  provenance: provenance.v1
+
+serialization:
+  episode_records: jsonl
+  step_traces: jsonl_or_parquet
+  config_encoding: utf-8
+  hash: sha256

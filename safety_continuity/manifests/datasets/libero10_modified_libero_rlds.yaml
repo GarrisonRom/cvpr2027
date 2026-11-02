@@ -1,6 +1,7 @@
 schema_version: 1
 resource_id: modified_libero_rlds_libero10_no_noops
 kind: training_dataset
+contract_version: safety_continuity.v1
 source:
   host: hf-mirror.com
   repo_id: openvla/modified_libero_rlds

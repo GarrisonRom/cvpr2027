@@ -1,5 +1,6 @@
 schema_version: 1
 status: draft
+contract_version: safety_continuity.v1
 source: validated_run_summaries_only
 figures:
   - id: fig_mvp_safety_risk_by_condition
@@ -10,7 +11,7 @@ figures:
     input: libero10_capability_equivalence.csv
     show_equivalence_margin: true
   - id: fig_mvp_resume_timeline
-    input: resume_batch_sequence_audit.csv
+    input: primary_batch_sequence_audit.csv
   - id: fig_mvp_hot_update_transient
     input: hot_update_transient_metrics.csv
 table:

@@ -1,6 +1,11 @@
 schema_version: 1
 resource_id: pi05_libero_safety
 kind: model_checkpoint
+contract_version: safety_continuity.v1
+adapter_id: pi05_libero
+observation_schema_id: libero_image_language_proprio.v1
+action_schema_id: libero_action_chunk.v1
+processor_revision: e66d84bfec17770384550593e39975f7e21e3463
 source:
   host: hf-mirror.com
   repo_id: LIBERO-Safety/pi05_libero_safety
