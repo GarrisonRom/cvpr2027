@@ -74,6 +74,7 @@ class BatchConsumptionRecord:
     microbatch_index: int
     sample_position: int
     sample: UpdateSampleRef
+    dataset_revision: str | None = None
 
     def __post_init__(self) -> None:
         validate_run_id(self.run_id)
@@ -88,6 +89,10 @@ class BatchConsumptionRecord:
             raise ContractError("optimizer_step must be a positive integer")
         if not isinstance(self.sample, UpdateSampleRef):
             raise ContractError("consumed sample must be an UpdateSampleRef")
+        if self.dataset_revision is not None and (
+            not isinstance(self.dataset_revision, str) or not self.dataset_revision.strip()
+        ):
+            raise ContractError("dataset_revision must be non-empty text when present")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -100,6 +105,7 @@ class BatchConsumptionRecord:
             "microbatch_index": self.microbatch_index,
             "sample_position": self.sample_position,
             "sample": self.sample.to_dict(),
+            "dataset_revision": self.dataset_revision,
         }
 
 @dataclass(frozen=True)

@@ -9,7 +9,7 @@
 | 项目 | MVP 选择 |
 |---|---|
 | 主模型 | π0.5；优先从公开的 LIBERO-Safety π0.5 checkpoint 开始 |
-| 训练/推理栈 | OpenPI，固定一个可复现版本；用参数高效微调，保存完整训练状态 |
+| 训练/推理栈 | OpenPI，固定一个可复现版本；released safety checkpoint 使用原生 `action_out_proj` 参数子集，保存完整训练状态 |
 | 经典能力基准 | 标准 LIBERO-10 |
 | 安全基准 | LIBERO-Safety；选语义安全和人机物理安全两个套件 |
 | 更新数据 | LIBERO 训练演示的预先固定子集；训练任务/样本与评测拆分隔离 |
@@ -57,7 +57,7 @@
 
 ### P0：工程 smoke run
 
-用 1 个训练种子、极小数据和 100 optimizer steps 验证：模型加载、LoRA 微调、checkpoint 保存、进程终止/恢复、episode 评估、event 日志和输出路径可用。Smoke run 不进入效果统计，不作科学结论。
+用 1 个训练种子、极小数据和 100 optimizer steps 验证：模型加载、原生参数子集更新、checkpoint 保存、进程终止/恢复、episode 评估、event 日志和输出路径可用。Smoke run 不进入效果统计，不作科学结论。
 
 准入条件：
 
@@ -183,7 +183,7 @@ B2 与 B1 比较估计中途切换的额外影响；B3 与 B0 比较基础设施
 - configs/data/libero_benign_update.yaml：训练数据版本、任务排除列表、样本 manifest 和增强。
 - configs/data/libero_safety_eval.yaml：两个安全套件、L1 难度、官方测试拆分。
 - configs/data/libero10_eval.yaml：LIBERO-10 任务和初始状态拆分。
-- configs/training/pi05_lora_mvp.yaml：LoRA 模块、T=2000、batch/gradient accumulation、精度、优化器和保存策略。
+- configs/training/pi05_lora_mvp.yaml：原生 action output projection、T=2000、batch/gradient accumulation、精度、优化器和保存策略。
 - configs/interruption/resume_full.yaml：完整恢复状态清单。
 - configs/interruption/resume_optimizer_reset.yaml：只重置 optimizer moments。
 - configs/interruption/resume_weights_only.yaml：weights-only 复合恢复定义。

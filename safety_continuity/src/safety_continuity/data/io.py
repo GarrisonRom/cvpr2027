@@ -116,8 +116,8 @@ def read_batch_consumption_jsonl(
     if positions != sorted(positions) or len(positions) != len(set(positions)):
         raise ContractError("batch consumption positions must be strictly ordered and unique")
     steps = sorted({record.optimizer_step for record in records})
-    if steps != list(range(1, steps[-1] + 1)):
-        raise ContractError("batch consumption optimizer steps must be contiguous from one")
+    if steps != list(range(steps[0], steps[-1] + 1)):
+        raise ContractError("batch consumption optimizer steps must be contiguous")
     grouped_positions: dict[tuple[int, int], list[int]] = {}
     for record in records:
         grouped_positions.setdefault(

@@ -658,10 +658,18 @@ def _read_run_batch_evidence(
         consumption_path,
         expected_run_id=run_id,
     )
-    if len(consumption) != len(samples):
-        raise ContractError("consumed sample count does not match the frozen batch schedule")
-    for index, (record, expected_sample) in enumerate(zip(consumption, samples)):
-        if record.sequence_index != index or record.sample != expected_sample:
+    expected_samples = samples[
+        reference.schedule_start_ordinal:
+        reference.schedule_start_ordinal + reference.expected_optimizer_steps
+    ]
+    if len(consumption) != len(expected_samples):
+        raise ContractError("consumed sample count does not match this run's batch schedule slice")
+    for index, (record, expected_sample) in enumerate(zip(consumption, expected_samples)):
+        if (
+            record.sequence_index != index
+            or record.sample != expected_sample
+            or record.sample.ordinal != reference.schedule_start_ordinal + index
+        ):
             raise ContractError(
                 f"consumed sample at sequence index {index} differs from the frozen schedule"
             )
@@ -670,8 +678,8 @@ def _read_run_batch_evidence(
             or record.training_seed != training_seed
         ):
             raise ContractError("batch consumption identity does not match the run")
-    if consumption[-1].optimizer_step != reference.expected_optimizer_steps:
-        raise ContractError("batch consumption trace does not reach the configured final optimizer step")
+    if len(consumption) != reference.expected_optimizer_steps:
+        raise ContractError("batch consumption trace length differs from the configured update count")
     return {
         "run_id": run_id,
         "model_id": model_id,
@@ -753,10 +761,34 @@ def _audit_control_batch_sequences(
                         and left_ref.dataset_revision == right_ref.dataset_revision
                         and left_ref.sha256 == right_ref.sha256
                         and left_ref.sample_count == right_ref.sample_count
-                        and left_ref.expected_optimizer_steps == right_ref.expected_optimizer_steps
                         and left["samples"] == right["samples"]
                     )
-                    same_consumption = left_sequence == right_sequence
+                    suffix_start = max(
+                        left_ref.schedule_start_ordinal,
+                        right_ref.schedule_start_ordinal,
+                    )
+                    left_suffix = [
+                        item for item in left_sequence
+                        if item[3].ordinal >= suffix_start
+                    ]
+                    right_suffix = [
+                        item for item in right_sequence
+                        if item[3].ordinal >= suffix_start
+                    ]
+                    left_identity = [(item[1], item[2], item[3]) for item in left_suffix]
+                    right_identity = [(item[1], item[2], item[3]) for item in right_suffix]
+                    expected_suffix_count = left_ref.sample_count - suffix_start
+                    same_consumption = (
+                        left_ref.schedule_start_ordinal <= suffix_start
+                        and right_ref.schedule_start_ordinal <= suffix_start
+                        and len(left_identity) == expected_suffix_count
+                        and len(right_identity) == expected_suffix_count
+                        and left_identity == right_identity
+                        and [item[3].ordinal for item in left_suffix]
+                        == list(range(suffix_start, left_ref.sample_count))
+                        and [item[3].ordinal for item in right_suffix]
+                        == list(range(suffix_start, right_ref.sample_count))
+                    )
                     row.update({
                         "batch_manifest_id": left_ref.manifest_id,
                         "dataset_revision": left_ref.dataset_revision,
@@ -767,6 +799,12 @@ def _audit_control_batch_sequences(
                         "consumed_record_count_target": len(left_sequence),
                         "consumed_record_count_reference": len(right_sequence),
                         "expected_optimizer_steps": left_ref.expected_optimizer_steps,
+                        "target_schedule_start_ordinal": left_ref.schedule_start_ordinal,
+                        "reference_schedule_start_ordinal": right_ref.schedule_start_ordinal,
+                        "compared_schedule_start_ordinal": suffix_start,
+                        "expected_compared_samples": expected_suffix_count,
+                        "compared_samples_target": len(left_identity),
+                        "compared_samples_reference": len(right_identity),
                         "same_manifest": same_manifest,
                         "same_consumption_sequence": same_consumption,
                         "status": "pass" if same_manifest and same_consumption else "fail",

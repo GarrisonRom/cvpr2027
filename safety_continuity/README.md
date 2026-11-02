@@ -52,7 +52,7 @@ Run the configuration check from the repository root:
 
     python safety_continuity/scripts/preflight/check_contracts.py
 
-Use `--strict` after adapter camera/action fields, LoRA targets, optimizer/batch
+Use `--strict` after adapter camera/action fields, optimizer/batch
 settings and the update split manifest have all been resolved:
 
     python -m safety_continuity.cli --workspace-root . --strict
@@ -90,6 +90,24 @@ The primary signal is supported only when the safety threshold, batch audits,
 capability gate and A0/A1 control all pass. It checks completed-run provenance
 and the resolved-config hash, and refuses to reuse an existing analysis id. The
 pilot screens are descriptive and are not formal equivalence tests.
+
+## OpenPI MVP runner
+
+The executable GPU runner is `scripts/train/openpi_mvp.py`. It selects the first
+available demonstration episode for each official LIBERO-10 task, freezes a
+2,000-sample schedule, forces `shuffle=False`, records every consumed sample,
+and supports `PRE`, `A0`, `A1`, `A2` and `A3` stages. The released safety
+checkpoint is trained through its native `action_out_proj` subset because the
+official LoRA configuration adds modules absent from the checkpoint.
+
+The runner expects OpenPI in an external checkout and uses the runtime roots
+from the shell. A typical GPU invocation is:
+
+    PYTHONPATH=/root/cvpr2027/safety_continuity/src /root/openpi-venv-compatible/bin/python safety_continuity/scripts/train/openpi_mvp.py --openpi-root /root/openpi --payload-root /root/autodl-tmp/cvpr2027-payloads --run-id 20261103_mvp_pi05_pre_s11 --condition PRE --seed 11 --total-steps 1000 --schedule-count 1000 --schedule-path /root/autodl-tmp/cvpr2027-payloads/data/splits/mvp_update_samples.jsonl --selected-episodes 0 1 2 6 7 8 10 12 14 27 --checkpoint-name pre_s11
+
+The interruption branches reuse the resulting checkpoint directory with
+`--resume` or `--source-checkpoint-dir`; their metadata and batch-consumption
+records are required inputs to analysis.
 
 ## Model adapters
 

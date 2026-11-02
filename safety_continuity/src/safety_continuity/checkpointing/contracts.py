@@ -59,6 +59,7 @@ class StateEntry:
     restore_compatible: bool
     files: tuple[CheckpointFile, ...] = ()
     reset_reason: str | None = None
+    logical_locator: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.key, str) or self.key not in STATE_KEYS:
@@ -74,6 +75,10 @@ class StateEntry:
             raise ContractError(f"state {self.key} lists duplicate checkpoint files")
         if self.included and not self.files:
             raise ContractError(f"included state {self.key} needs at least one file")
+        if self.included and (
+            not isinstance(self.logical_locator, str) or not self.logical_locator.strip()
+        ):
+            raise ContractError(f"included state {self.key} needs a logical_locator")
         if not self.included and self.files:
             raise ContractError(f"excluded state {self.key} cannot list checkpoint files")
         if not self.included and (
@@ -123,12 +128,18 @@ class CheckpointManifest:
         if set(keys) != set(STATE_KEYS) or len(keys) != len(STATE_KEYS):
             raise ContractError("checkpoint manifest must explicitly list every state key")
         file_paths = [
-            file.relative_path
+            file
             for entry in self.entries
             for file in entry.files
         ]
-        if len(file_paths) != len(set(file_paths)):
-            raise ContractError("checkpoint manifest maps one file to multiple state entries")
+        files_by_path: dict[str, CheckpointFile] = {}
+        for file in file_paths:
+            previous = files_by_path.setdefault(file.relative_path, file)
+            if previous != file:
+                raise ContractError(
+                    f"checkpoint path has inconsistent size/hash across state entries: "
+                    f"{file.relative_path}"
+                )
         if not self.save_completed:
             raise ContractError("an incomplete checkpoint cannot be used for resume")
         inventory = {entry.key: entry for entry in self.entries}
@@ -221,6 +232,7 @@ def manifest_from_mapping(payload: Mapping[str, Any]) -> CheckpointManifest:
                 files=files,
                 restore_compatible=entry["restore_compatible"],
                 reset_reason=entry.get("reset_reason"),
+                logical_locator=entry.get("logical_locator"),
             ))
         entries = tuple(entries_list)
         manifest = CheckpointManifest(

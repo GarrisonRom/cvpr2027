@@ -6,7 +6,7 @@ contract_version: safety_continuity.v1
 
 configs:
   defaults: safety_continuity/configs/defaults.yaml
-  data_update: safety_continuity/configs/data/libero10_no_noops.yaml
+  data_update: safety_continuity/configs/data/libero10_openpi_minimal.yaml
   data_safety: safety_continuity/configs/data/libero_safety_eval.yaml
   model: safety_continuity/configs/models/pi05_libero_safety.yaml
   training: safety_continuity/configs/training/pi05_lora_mvp.yaml
@@ -16,7 +16,7 @@ configs:
 
 resources:
   model_manifest: safety_continuity/manifests/models/pi05_libero_safety.yaml
-  update_dataset_manifest: safety_continuity/manifests/datasets/libero10_modified_libero_rlds.yaml
+  update_dataset_manifest: safety_continuity/manifests/datasets/physical_intelligence_libero.yaml
   safety_asset_manifest: safety_continuity/manifests/datasets/libero_safety_assets.yaml
 
 factors:

@@ -1,0 +1,25 @@
+schema_version: 1
+status: pilot_runtime_manifest
+contract_version: safety_continuity.v1
+record_schema: update_sample.v1
+dataset_id: physical_intelligence_libero
+manifest: safety_continuity/manifests/datasets/physical_intelligence_libero.yaml
+repo_id: physical-intelligence/libero
+dataset_revision: v2.0
+format: lerobot_v2
+root_env: SC_CACHE_ROOT
+relative_path: huggingface/lerobot/physical-intelligence/libero
+selected_episode_indices: [0, 1, 2, 6, 7, 8, 10, 12, 14, 27]
+selected_tasks: libero_10_official
+video_download: false
+sample_schedule:
+  root_env: SC_SPLIT_ROOT
+  relative_path: mvp_update_samples.jsonl
+  seed: 20261103
+  freeze_before_training: true
+  one_sample_per_optimizer_step: true
+splits:
+  update_manifest_root_env: SC_SPLIT_ROOT
+  update_manifest: mvp_update_samples.jsonl
+  evaluation_task_ids: libero10_official
+  prohibit_update_eval_initial_state_overlap: true

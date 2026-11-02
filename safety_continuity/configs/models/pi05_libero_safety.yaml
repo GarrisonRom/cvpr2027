@@ -28,10 +28,10 @@ action:
   dtype: float32
   normalization_id: checkpoint_assets
 adapter:
-  type: lora
+  type: native_parameter_subset
   enabled: true
-  target_modules: null
-  note: Resolve target modules from the pinned OpenPI/model implementation during preflight.
+  trainable_modules: [action_out_proj]
+  note: LoRA adds modules absent from the released safety checkpoint; MVP updates the native action output projection only.
 embodiment:
   platform: libero_franka_panda
   action_schema: libero_action_chunk.v1

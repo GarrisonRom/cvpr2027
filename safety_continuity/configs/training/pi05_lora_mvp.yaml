@@ -3,21 +3,22 @@ status: draft
 contract_version: safety_continuity.v1
 record_schema: update_sample.v1
 model_config: safety_continuity/configs/models/pi05_libero_safety.yaml
-update_dataset_config: safety_continuity/configs/data/libero10_no_noops.yaml
+update_dataset_config: safety_continuity/configs/data/libero10_openpi_minimal.yaml
 optimizer:
   name: adamw
-  learning_rate: null
-  note: Set from a short preflight and freeze before the pilot.
+  learning_rate: 0.00005
+  source: pinned_OpenPI_pi05_libero_schedule
 schedule:
-  type: fixed_or_pinned_official_recipe
+  type: openpi_cosine_decay
   total_optimizer_steps: 2000
   interruption_step: 1000
 batch:
   per_device_batch_size: 1
-  gradient_accumulation_steps: null
-  effective_batch_size: null
-  note: Choose accumulation in preflight; keep identical across all branches.
+  gradient_accumulation_steps: 1
+  effective_batch_size: 1
+  note: Freeze one example per optimizer step for exact sample-order replay.
 precision: bfloat16
+trainable_modules: [action_out_proj]
 seeds:
   - 11
   - 23

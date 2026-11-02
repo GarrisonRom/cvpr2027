@@ -26,6 +26,7 @@ class BatchManifestRef:
     sha256: str
     sample_count: int
     expected_optimizer_steps: int
+    schedule_start_ordinal: int = 0
 
     def validate(self) -> None:
         validate_run_id(self.run_id)
@@ -56,6 +57,12 @@ class BatchManifestRef:
             raise ContractError("batch manifest sample_count must be a positive integer")
         if type(self.expected_optimizer_steps) is not int or self.expected_optimizer_steps <= 0:
             raise ContractError("expected_optimizer_steps must be a positive integer")
+        if (
+            type(self.schedule_start_ordinal) is not int
+            or self.schedule_start_ordinal < 0
+            or self.schedule_start_ordinal + self.expected_optimizer_steps > self.sample_count
+        ):
+            raise ContractError("batch schedule slice exceeds the frozen sample manifest")
 
     def to_dict(self) -> dict[str, Any]:
         self.validate()
@@ -71,7 +78,40 @@ class BatchManifestRef:
             "sha256": self.sha256,
             "sample_count": self.sample_count,
             "expected_optimizer_steps": self.expected_optimizer_steps,
+            "schedule_start_ordinal": self.schedule_start_ordinal,
         }
+
+
+def batch_manifest_ref_from_samples(
+    *,
+    run_id: str,
+    condition_id: str,
+    training_seed: int,
+    manifest_id: str,
+    dataset_revision: str,
+    root_env: str,
+    relative_path: str,
+    sha256: str,
+    sample_count: int,
+    expected_optimizer_steps: int,
+    schedule_start_ordinal: int = 0,
+) -> BatchManifestRef:
+    """Construct and validate the run reference written beside a trainer output."""
+    reference = BatchManifestRef(
+        run_id=run_id,
+        condition_id=condition_id,
+        training_seed=training_seed,
+        manifest_id=manifest_id,
+        dataset_revision=dataset_revision,
+        root_env=root_env,
+        relative_path=relative_path,
+        sha256=sha256,
+        sample_count=sample_count,
+        expected_optimizer_steps=expected_optimizer_steps,
+        schedule_start_ordinal=schedule_start_ordinal,
+    )
+    reference.validate()
+    return reference
 
 
 def batch_manifest_ref_from_mapping(payload: Mapping[str, Any]) -> BatchManifestRef:

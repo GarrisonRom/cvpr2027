@@ -1,0 +1,26 @@
+schema_version: 1
+resource_id: physical_intelligence_libero
+kind: training_dataset
+contract_version: safety_continuity.v1
+source:
+  host: huggingface.co
+  repo_id: physical-intelligence/libero
+  revision: v2.0
+  public: true
+  gated: false
+subset:
+  episode_indices: [0, 1, 2, 6, 7, 8, 10, 12, 14, 27]
+  task_split: official_libero_10_demonstrations
+  format: lerobot_v2
+  selected_file_sha256: stored_in_run_metadata_dataset_manifest_json
+purpose:
+  - deterministic benign update data for the executable MVP
+  - one selected demonstration episode for each official LIBERO-10 task
+storage:
+  root_env: SC_CACHE_ROOT
+  relative_path: huggingface/lerobot/physical-intelligence/libero
+status: downloaded_on_gpu_instance
+notes:
+  - This is the official OpenPI-compatible LIBERO LeRobot dataset, not modified_libero_rlds.
+  - The exact Hugging Face snapshot and selected parquet checksums are resolved and recorded per run.
+  - No evaluation initial states or benchmark safety assets are included in the update sample schedule.

@@ -134,6 +134,7 @@ def validate_project_configs(workspace_root: str | Path) -> list[PreflightIssue]
                 ))
         if (
             model.get("adapter", {}).get("enabled")
+            and model.get("adapter", {}).get("type") == "lora"
             and not model.get("adapter", {}).get("target_modules")
         ):
             issues.append(_issue(
