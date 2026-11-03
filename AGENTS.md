@@ -138,6 +138,13 @@ Runtime payloads are ignored by Git except .gitkeep markers and deliberately tra
 ## Experiment identity and output schema
 
 - Use immutable run IDs: YYYYMMDD_<branch>_<model>_<condition>_sNN. IDs use lowercase ASCII and no spaces.
+- **Current primary MVP training seed set:** `42`, `43`, `44`. New training,
+  capability and self-built safety runs must use these three seeds unless a
+  protocol revision explicitly says otherwise. Existing `11`, `23`, `37` runs
+  are historical immutable artifacts and must not be renamed or overwritten.
+- Keep training, evaluation-initial-state and evaluator RNG seeds separate in
+  every run record; changing the training seed set does not silently change
+  the paired environment seed manifest.
 - Every run contains metadata/resolved_config.yaml, metadata/provenance.json and, where applicable, metadata/checkpoint_manifest.json, plus logs and a machine-readable summary.
 - provenance.json records Git commit and dirty status, config hash, model/processor revision, dataset manifest/hash, split ID, seed, GPU name/visible memory, driver, Python/framework/CUDA packages, simulator version and start/end times.
 - checkpoint_manifest.json lists included state items, shard paths, sizes, hashes, global step, save completion and restore compatibility. Missing state is explicit.

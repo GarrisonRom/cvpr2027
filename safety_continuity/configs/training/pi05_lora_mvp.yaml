@@ -20,9 +20,9 @@ batch:
 precision: bfloat16
 trainable_modules: [action_out_proj]
 seeds:
-  - 11
-  - 23
-  - 37
+  - 42
+  - 43
+  - 44
 checkpoint:
   save_at_interruption_step: true
   write_temp_verify_then_publish: true

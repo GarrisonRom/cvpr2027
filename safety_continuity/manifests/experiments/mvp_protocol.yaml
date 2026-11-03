@@ -23,7 +23,7 @@ factors:
   interruption_step_fraction: 0.5
   total_optimizer_steps: 2000
   conditions: [A0, A1, A2, A3]
-  training_seeds: [11, 23, 37]
+  training_seeds: [42, 43, 44]
   evaluation_initial_state_pairing: required
   batch_manifest_pairing: required
 

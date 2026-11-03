@@ -64,7 +64,7 @@ experiment launch must not proceed while the preflight reports an error.
 
 Validate a saved checkpoint inventory against one configured resume condition:
 
-    python safety_continuity/scripts/resume/validate_restore_plan.py --checkpoint-manifest runs/20261102_mvp_pi05_a2_s11/metadata/checkpoint_manifest.json --checkpoint-root checkpoints/training/20261102_mvp_pi05_a2_s11/1000 --condition A2
+    python safety_continuity/scripts/resume/validate_restore_plan.py --checkpoint-manifest runs/20261104_mvp_pi05_a2_s42/metadata/checkpoint_manifest.json --checkpoint-root checkpoints/training/20261104_mvp_pi05_a2_s42/1000 --condition A2
 
 State file paths are resolved relative to `--checkpoint-root`, which points to
 the actual checkpoint payload directory (not the run metadata directory).
@@ -73,13 +73,13 @@ the actual checkpoint payload directory (not the run metadata directory).
 
 Validate completed runs by listing each run id explicitly:
 
-    python safety_continuity/scripts/analyze/validate_episodes.py --run-id 20261102_mvp_pi05_a1_s11
+    python safety_continuity/scripts/analyze/validate_episodes.py --run-id 20261104_mvp_pi05_a1_s42
 
 Generate the default paired A2-versus-A1 analysis by listing all three-seed runs
 for A0, A1 and A2 (each run should contain the configured LIBERO-10 and safety
 benchmark episodes). A0 and A1 are required for the resume-control gate:
 
-    python safety_continuity/scripts/analyze/analyze_mvp.py --run-id 20261102_mvp_pi05_a0_s11 --run-id 20261102_mvp_pi05_a0_s23 --run-id 20261102_mvp_pi05_a0_s37 --run-id 20261102_mvp_pi05_a1_s11 --run-id 20261102_mvp_pi05_a1_s23 --run-id 20261102_mvp_pi05_a1_s37 --run-id 20261102_mvp_pi05_a2_s11 --run-id 20261102_mvp_pi05_a2_s23 --run-id 20261102_mvp_pi05_a2_s37 --analysis-id 20261102_analysis_mvp_primary_s00
+    python safety_continuity/scripts/analyze/analyze_mvp.py --run-id 20261102_mvp_pi05_a0_s42 --run-id 20261102_mvp_pi05_a0_s43 --run-id 20261102_mvp_pi05_a0_s44 --run-id 20261102_mvp_pi05_a1_s42 --run-id 20261102_mvp_pi05_a1_s43 --run-id 20261102_mvp_pi05_a1_s44 --run-id 20261102_mvp_pi05_a2_s42 --run-id 20261102_mvp_pi05_a2_s43 --run-id 20261102_mvp_pi05_a2_s44 --analysis-id 20261102_analysis_mvp_primary_s00
 
 The analysis writes a new, immutable directory under `runs/<analysis_id>/` with
 source hashes, run summaries, seed-level paired effects, and pilot bootstrap
@@ -103,7 +103,7 @@ official LoRA configuration adds modules absent from the checkpoint.
 The runner expects OpenPI in an external checkout and uses the runtime roots
 from the shell. A typical GPU invocation is:
 
-    PYTHONPATH=/root/cvpr2027/safety_continuity/src /root/openpi-venv-compatible/bin/python safety_continuity/scripts/train/openpi_mvp.py --openpi-root /root/openpi --payload-root /root/autodl-tmp/cvpr2027-payloads --run-id 20261103_mvp_pi05_pre_s11 --condition PRE --seed 11 --total-steps 1000 --schedule-count 1000 --schedule-path /root/autodl-tmp/cvpr2027-payloads/data/splits/mvp_update_samples.jsonl --selected-episodes 0 1 2 6 7 8 10 12 14 27 --checkpoint-name pre_s11
+    PYTHONPATH=/root/cvpr2027/safety_continuity/src /root/openpi-venv-compatible/bin/python safety_continuity/scripts/train/openpi_mvp.py --openpi-root /root/openpi --payload-root /root/autodl-tmp/cvpr2027-payloads --run-id 20261104_mvp_pi05_pre_s42 --condition PRE --seed 42 --total-steps 1000 --schedule-count 1000 --schedule-path /root/autodl-tmp/cvpr2027-payloads/data/splits/mvp_update_samples_s42.jsonl --selected-episodes 0 1 2 6 7 8 10 12 14 27 --checkpoint-name pre_s42
 
 The interruption branches reuse the resulting checkpoint directory with
 `--resume` or `--source-checkpoint-dir`; their metadata and batch-consumption
@@ -121,7 +121,7 @@ Run the CPU-only contract smoke:
 
 Run all A0/A1/A2/A3 conditions for one seed and suite on a GPU instance:
 
-    python safety_continuity/scripts/evaluate/run_self_built_mvp.py --mode full --suite human_safety --condition all --seed 23 --payload-root /root/autodl-tmp/cvpr2027-payloads --checkpoint-root /root/autodl-tmp/cvpr2027-payloads/checkpoints --openpi-root /root/openpi --output-root /root/autodl-tmp/cvpr2027-payloads/runs/self_built_human_s23
+    python safety_continuity/scripts/evaluate/run_self_built_mvp.py --mode full --suite human_safety --condition all --seed 42 --payload-root /root/autodl-tmp/cvpr2027-payloads --checkpoint-root /root/autodl-tmp/cvpr2027-payloads/checkpoints --openpi-root /root/openpi --output-root /root/autodl-tmp/cvpr2027-payloads/runs/self_built_human_s42
 
 Full mode requires LIBERO-Safety, MuJoCo/EGL and the OpenPI websocket
 dependencies in the selected environment. Generated labels use

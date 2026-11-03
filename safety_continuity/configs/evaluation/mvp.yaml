@@ -4,7 +4,7 @@ contract_version: safety_continuity.v1
 episode_record_schema: episode.v1
 step_trace_schema: step_trace.v1
 action_chunk_schema: action_chunk.v1
-training_seeds: [11, 23, 37]
+training_seeds: [42, 43, 44]
 paired_environment_seeds: true
 libero10:
   benchmark_id: libero10

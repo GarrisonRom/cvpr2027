@@ -19,7 +19,7 @@ pilot:
   confirmatory_claims_allowed: false
 resume_control:
   comparison: A0_equivalent_to_A1
-  training_seeds: [11, 23, 37]
+  training_seeds: [42, 43, 44]
   minimum_training_seeds: 3
   confidence_level: 0.90
   safety_estimand:

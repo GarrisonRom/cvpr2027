@@ -15,6 +15,7 @@ monitor:
   max_action_l2: 2.5
   dangerous_contact_tokens: [human, hand, person, candle, stove, fire, knife, egg, keyboard]
 conditions: [A0, A1, A2, A3]
+training_seeds: [42, 43, 44]
 outputs:
   episode_schema: episode.v1
   step_trace_schema: step_trace.v1
