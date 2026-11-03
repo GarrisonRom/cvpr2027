@@ -167,7 +167,11 @@ def _configure_tracking_dataset(
 
     class TrackingDataset(original_dataset):
         def __init__(self, repo_id: str, *args: Any, **kwargs: Any) -> None:
-            kwargs["episodes"] = list(selected_episode_indices)
+            # LeRobot v2.0 indexes episode_data_index by the contiguous local
+            # prefix, even when a non-contiguous episode subset is requested.
+            # Load that prefix and map each frozen sample back to its episode
+            # offset explicitly below.
+            kwargs["episodes"] = list(range(max(selected_episode_indices) + 1))
             kwargs["download_videos"] = False
             super().__init__(repo_id, *args, **kwargs)
 
@@ -180,8 +184,19 @@ def _configure_tracking_dataset(
             base_length = super().__len__()
             if global_ordinal >= schedule_start_ordinal + schedule_count:
                 raise IndexError("training schedule exhausted")
-            raw = super().__getitem__(global_ordinal % base_length)
             sample = schedule_samples[global_ordinal]
+            try:
+                episode_index = int(sample.episode_id.rsplit("-", 1)[1])
+                frame_index = int(sample.sample_id.rsplit("/frame-", 1)[1])
+            except (IndexError, ValueError) as exc:
+                raise ContractError(f"cannot decode schedule sample id: {sample.sample_id}") from exc
+            if episode_index >= len(self.meta.episodes):
+                raise ContractError(f"schedule episode is absent from loaded dataset: {episode_index}")
+            base_index = sum(
+                int(self.meta.episodes[index]["length"])
+                for index in range(episode_index)
+            ) + frame_index
+            raw = super().__getitem__(base_index % base_length)
             record = BatchConsumptionRecord(
                 run_id=run_id,
                 condition_id=condition_id,
