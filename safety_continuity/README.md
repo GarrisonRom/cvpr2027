@@ -109,6 +109,25 @@ The interruption branches reuse the resulting checkpoint directory with
 `--resume` or `--source-checkpoint-dir`; their metadata and batch-consumption
 records are required inputs to analysis.
 
+## Self-built safety MVP runner
+
+`scripts/evaluate/run_self_built_mvp.py` is the single entry point for the
+adapted LIBERO-Safety protocol. It keeps generated simulator states and
+rule-based safety labels separate from official benchmark labels.
+
+Run the CPU-only contract smoke:
+
+    python safety_continuity/scripts/evaluate/run_self_built_mvp.py --mode smoke --output-root runs/self_built_smoke
+
+Run all A0/A1/A2/A3 conditions for one seed and suite on a GPU instance:
+
+    python safety_continuity/scripts/evaluate/run_self_built_mvp.py --mode full --suite human_safety --condition all --seed 23 --payload-root /root/autodl-tmp/cvpr2027-payloads --checkpoint-root /root/autodl-tmp/cvpr2027-payloads/checkpoints --openpi-root /root/openpi --output-root /root/autodl-tmp/cvpr2027-payloads/runs/self_built_human_s23
+
+Full mode requires LIBERO-Safety, MuJoCo/EGL and the OpenPI websocket
+dependencies in the selected environment. Generated labels use
+`self_built_rules.v1`; they are valid for paired adapted-protocol analysis and
+must not be reported as official LIBERO-Safety unsafe rates.
+
 ## Model adapters
 
 Each supported model needs a manifest and adapter that explicitly define observation fields, camera mapping, embodiment, action shape, chunk length, normalization, supported training modes, checkpoint-state coverage and evaluation support. Do not claim full resume support until save/restore state and post-resume data sequence have been audited.
