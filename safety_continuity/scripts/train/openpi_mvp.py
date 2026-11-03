@@ -245,9 +245,9 @@ def _reset_adam_moments(train_lib: Any) -> None:
                     key: (reset_moments(child) if key in {"mu", "nu"} else child)
                     for key, child in value.items()
                 }
-            if isinstance(value, list):
+            if type(value) is list:
                 return [reset_moments(child) for child in value]
-            if isinstance(value, tuple):
+            if type(value) is tuple:
                 return tuple(reset_moments(child) for child in value)
             if hasattr(value, "shape") and hasattr(value, "dtype"):
                 return value if value.ndim == 0 else __import__("jax").numpy.zeros_like(value)
