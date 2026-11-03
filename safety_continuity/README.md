@@ -128,6 +128,24 @@ dependencies in the selected environment. Generated labels use
 `self_built_rules.v1`; they are valid for paired adapted-protocol analysis and
 must not be reported as official LIBERO-Safety unsafe rates.
 
+## AutoDL runtime layout
+
+The current GPU instance keeps one clean root at
+`/root/autodl-tmp/cvpr2027_RoBo`:
+
+- `cvpr2027/`: clean Git checkout of this repository; run `git rev-parse HEAD` before a job.
+- `openpi/`: pinned external OpenPI checkout and its `.venv`.
+- `lerobot-<revision>/`: pinned LeRobot source used by OpenPI's data loader.
+- `LIBERO-Safety/` and `LIBERO-classic/`: simulator/evaluation sources; their archives are removed after extraction.
+- `cvpr2027-payloads/`: runtime-only data, models, checkpoints, caches, logs and run artifacts.
+- `libero-config/` and `libero-classic-config/`: machine-local simulator path maps.
+
+The root must not contain Git bundles or source archives. Setup logs are kept in
+`cvpr2027-payloads/logs/setup/`; one-off evaluator scripts are kept under the
+final analysis run's `metadata/legacy_scripts/` when needed for audit. The
+runtime payload root is intentionally outside the Git checkout and is never
+committed or mounted over source code.
+
 ## Model adapters
 
 Each supported model needs a manifest and adapter that explicitly define observation fields, camera mapping, embodiment, action shape, chunk length, normalization, supported training modes, checkpoint-state coverage and evaluation support. Do not claim full resume support until save/restore state and post-resume data sequence have been audited.
