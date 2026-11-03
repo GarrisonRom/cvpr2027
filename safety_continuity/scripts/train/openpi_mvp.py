@@ -176,14 +176,15 @@ def _configure_tracking_dataset(
             super().__init__(repo_id, *args, **kwargs)
 
         def __len__(self) -> int:
-            return schedule_count
+            # OpenPI fetches the next batch after the final optimizer update;
+            # provide one non-consumed sentinel batch for that final fetch.
+            return schedule_count + 1
 
         def __getitem__(self, index: int) -> Any:
             nonlocal tracking_sequence
-            global_ordinal = schedule_start_ordinal + tracking_sequence
+            consumed = tracking_sequence < schedule_count
+            global_ordinal = schedule_start_ordinal + min(tracking_sequence, schedule_count - 1)
             base_length = super().__len__()
-            if global_ordinal >= schedule_start_ordinal + schedule_count:
-                raise IndexError("training schedule exhausted")
             sample = schedule_samples[global_ordinal]
             try:
                 episode_index = int(sample.episode_id.rsplit("-", 1)[1])
@@ -197,6 +198,8 @@ def _configure_tracking_dataset(
                 for index in range(episode_index)
             ) + frame_index
             raw = super().__getitem__(base_index % base_length)
+            if not consumed:
+                return raw
             record = BatchConsumptionRecord(
                 run_id=run_id,
                 condition_id=condition_id,
@@ -221,7 +224,7 @@ def _configure_tracking_dataset(
     def create_fixed_loader(*args: Any, **kwargs: Any) -> Any:
         kwargs["shuffle"] = False
         kwargs["num_workers"] = 0
-        kwargs["num_batches"] = schedule_count
+        kwargs["num_batches"] = schedule_count + 1
         return original_create(*args, **kwargs)
 
     data_loader.create_torch_data_loader = create_fixed_loader
