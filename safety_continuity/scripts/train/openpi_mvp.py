@@ -46,6 +46,8 @@ LIBERO10_TASKS = (
     "pick up the book and place it in the back compartment of the caddy",
 )
 
+LIBERO_DATASET_REVISION = "v2.0"
+
 
 def _load_train_script(openpi_root: Path):
     script_path = openpi_root / "scripts" / "train.py"
@@ -81,7 +83,7 @@ def _load_openpi_modules(openpi_root: Path):
 def _official_episode_indices(repo_id: str) -> tuple[int, ...]:
     from lerobot.common.datasets.lerobot_dataset import LeRobotDatasetMetadata
 
-    metadata = LeRobotDatasetMetadata(repo_id)
+    metadata = LeRobotDatasetMetadata(repo_id, revision=LIBERO_DATASET_REVISION)
     first_by_task: dict[str, int] = {}
     for episode_index, episode in sorted(metadata.episodes.items()):
         for task in episode.get("tasks", []):
@@ -102,7 +104,7 @@ def _write_schedule(
 ) -> dict[str, Any]:
     from lerobot.common.datasets.lerobot_dataset import LeRobotDatasetMetadata
 
-    metadata = LeRobotDatasetMetadata(repo_id)
+    metadata = LeRobotDatasetMetadata(repo_id, revision=LIBERO_DATASET_REVISION)
     revision = str(metadata.revision)
     episode_lengths = {
         int(index): int(metadata.episodes[int(index)]["length"])
@@ -173,6 +175,7 @@ def _configure_tracking_dataset(
             # offset explicitly below.
             kwargs["episodes"] = list(range(max(selected_episode_indices) + 1))
             kwargs["download_videos"] = False
+            kwargs["revision"] = LIBERO_DATASET_REVISION
             super().__init__(repo_id, *args, **kwargs)
 
         def __len__(self) -> int:
