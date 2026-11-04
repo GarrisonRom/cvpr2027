@@ -6,7 +6,7 @@ Examples:
     python run_self_built_mvp.py --mode full --suite human_safety \
         --payload-root /mnt/cvpr2027-payloads --openpi-root /mnt/openpi
 
-Full mode starts one OpenPI websocket server per A0/A1/A2/A3 checkpoint.  The
+Full mode starts one OpenPI websocket server for each configured training condition. The
 generated labels are explicitly self-built and are never reported as official
 LIBERO-Safety labels.
 """
@@ -15,8 +15,10 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import importlib.metadata
 import json
 import os
+import platform
 import subprocess
 import sys
 import time
@@ -29,6 +31,8 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from safety_continuity.common.errors import ContractError
 from safety_continuity.common.identity import make_run_id
+from safety_continuity.common.config import sha256_payload
+from safety_continuity.common.provenance import Provenance, provenance_from_mapping
 from safety_continuity.data.schemas import EpisodeRecord, StepTraceRecord, validate_episode_batch
 from safety_continuity.evaluation.self_built import (
     PROTOCOL_VERSION,
@@ -41,6 +45,12 @@ from safety_continuity.evaluation.self_built_runner import run_libero_self_built
 
 
 CONDITIONS = ("A0", "A1", "A2", "A3")
+CONDITION_NAMES = {
+    "continuous_training": "A0",
+    "full_state_resume": "A1",
+    "optimizer_moment_reset": "A2",
+    "weights_only_restart": "A3",
+}
 
 
 def _write_json(path: Path, payload: Any) -> None:
@@ -160,10 +170,10 @@ def _checkpoint_path(
     checkpoint_root: Path,
     condition: str,
     seed: int,
-    a3_step: int,
+    weights_only_step: int,
     checkpoint_prefix: str = "",
 ) -> Path:
-    step = a3_step if condition == "A3" else 1999
+    step = weights_only_step if condition == "A3" else 1999
     name = f"{checkpoint_prefix}_{condition.lower()}_s{seed}" if checkpoint_prefix else f"{condition.lower()}_s{seed}"
     path = checkpoint_root / "openpi_mvp" / "pi05_libero_mvp" / name / str(step)
     if not path.is_dir():
@@ -178,27 +188,42 @@ def _full(args: argparse.Namespace) -> list[dict[str, Any]]:
         suites = list(("human_safety", "reasoning_safety"))
     else:
         suites = [args.suite]
-    conditions = CONDITIONS if args.condition == "all" else [args.condition]
+    if args.condition == "all":
+        conditions = CONDITIONS
+    else:
+        condition = CONDITION_NAMES.get(args.condition, args.condition)
+        if condition not in CONDITIONS:
+            raise ContractError(f"unsupported condition name: {args.condition}")
+        conditions = [condition]
     output_root = args.output_root.resolve()
     checkpoint_root = args.checkpoint_root.resolve()
     state_root = output_root / "state_manifest"
     summaries: list[dict[str, Any]] = []
     for suite in suites:
-        manifest_path = generate_libero_state_manifest(
-            suite_id=suite,
-            level=args.level,
-            output_root=state_root,
-            generation_seed=args.state_seed,
-            states_per_task=args.states_per_task,
-            camera_size=args.camera_size,
-            overwrite=args.overwrite_states,
-        )
+        if args.state_manifest is not None:
+            manifest_path = args.state_manifest.resolve()
+            manifest = load_state_manifest(manifest_path)
+            if manifest.suite_id != suite or manifest.level != args.level:
+                raise ContractError("provided state manifest does not match suite and level")
+            if manifest.states_per_task != args.states_per_task:
+                raise ContractError("provided state manifest has a different states_per_task")
+        else:
+            manifest_path = generate_libero_state_manifest(
+                suite_id=suite,
+                level=args.level,
+                output_root=state_root,
+                generation_seed=args.state_seed,
+                states_per_task=args.states_per_task,
+                camera_size=args.camera_size,
+                overwrite=args.overwrite_states,
+            )
+            manifest = load_state_manifest(manifest_path)
         for condition in conditions:
             checkpoint = _checkpoint_path(
                 checkpoint_root,
                 condition,
                 args.seed,
-                args.a3_step,
+                args.weights_only_step,
                 args.checkpoint_prefix,
             )
             run_id = make_run_id(
@@ -209,23 +234,40 @@ def _full(args: argparse.Namespace) -> list[dict[str, Any]]:
                 run_date=args.run_date,
             )
             run_dir = output_root / run_id
+            if run_dir.exists() and any(run_dir.iterdir()):
+                raise ContractError(f"refusing to overwrite existing evaluation run: {run_dir}")
             run_dir.mkdir(parents=True, exist_ok=True)
-            _write_json(
-                run_dir / "metadata" / "resolved_config.json",
-                {
-                    "schema": "self_built_resolved_config.v1",
-                    "protocol": PROTOCOL_VERSION,
-                    "run_id": run_id,
-                    "condition": condition,
-                    "suite": suite,
-                    "level": args.level,
-                    "seed": args.seed,
-                    "checkpoint": str(checkpoint),
-                    "checkpoint_prefix": args.checkpoint_prefix,
-                    "state_manifest": str(manifest_path),
-                    "official_labels": False,
-                },
+            resolved = {
+                "schema": "self_built_resolved_config.v1",
+                "protocol": PROTOCOL_VERSION,
+                "run_id": run_id,
+                "condition": condition,
+                "suite": suite,
+                "level": args.level,
+                "seed": args.seed,
+                "evaluation_seed": args.eval_seed,
+                "source_training_run_id": args.source_training_run_id,
+                "checkpoint": str(checkpoint),
+                "checkpoint_prefix": args.checkpoint_prefix,
+                "state_manifest": str(manifest_path),
+                "state_manifest_sha256": manifest.manifest_sha256(),
+                "states_per_task": manifest.states_per_task,
+                "episodes_per_task": args.episodes_per_task,
+                "replan_steps": args.replan_steps,
+                "num_steps_wait": args.num_steps_wait,
+                "max_steps": args.max_steps,
+                "official_labels": False,
+            }
+            metadata_dir = run_dir / "metadata"
+            metadata_dir.mkdir(parents=True, exist_ok=True)
+            _write_json(metadata_dir / "resolved_config.json", resolved)
+            import yaml
+
+            (metadata_dir / "resolved_config.yaml").write_text(
+                yaml.safe_dump(resolved, sort_keys=True, allow_unicode=True),
+                encoding="utf-8",
             )
+            started_at = dt.datetime.now(dt.UTC).isoformat()
             server_log = run_dir / "logs" / "policy_server.log"
             server_log.parent.mkdir(parents=True, exist_ok=True)
             env = os.environ.copy()
@@ -263,6 +305,66 @@ def _full(args: argparse.Namespace) -> list[dict[str, Any]]:
                     max_steps=args.max_steps,
                 )
                 _write_json(run_dir / "metrics" / "summary.json", summary)
+                training_run_id = args.source_training_run_id
+                training_provenance = None
+                if training_run_id:
+                    training_provenance_path = (
+                        args.payload_root / "runs" / training_run_id
+                        / "metadata" / "provenance.json"
+                    )
+                    training_provenance = provenance_from_mapping(
+                        json.loads(training_provenance_path.read_text(encoding="utf-8"))
+                    )
+                try:
+                    mujoco_version = importlib.metadata.version("mujoco")
+                except importlib.metadata.PackageNotFoundError:
+                    mujoco_version = "unavailable"
+                try:
+                    torch_version = importlib.metadata.version("torch")
+                except importlib.metadata.PackageNotFoundError:
+                    torch_version = "unavailable"
+                ended_at = dt.datetime.now(dt.UTC).isoformat()
+                provenance = Provenance(
+                    run_id=run_id,
+                    git_commit=os.environ.get("SC_GIT_COMMIT", "unknown"),
+                    git_dirty=os.environ.get("SC_GIT_DIRTY", "false").lower() == "true",
+                    config_hash=sha256_payload(resolved),
+                    model_id="pi05_libero_safety",
+                    model_revision=(
+                        training_provenance.model_revision if training_provenance
+                        else "not_recorded"
+                    ),
+                    processor_revision=(
+                        training_provenance.processor_revision if training_provenance
+                        else "not_recorded"
+                    ),
+                    dataset_manifest=f"{suite}_L{args.level}_self_built@{manifest.manifest_sha256()}",
+                    split_id=f"{suite}_L{args.level}_self_built_states",
+                    model_seed=args.seed,
+                    evaluation_seed=args.eval_seed,
+                    gpu_name=os.environ.get("SC_GPU_NAME", "unknown"),
+                    visible_memory_bytes=int(os.environ.get("SC_GPU_MEMORY_BYTES", "0")),
+                    driver=os.environ.get("SC_GPU_DRIVER", "unknown"),
+                    python_version=platform.python_version(),
+                    framework_versions={
+                        "torch": torch_version,
+                        "mujoco": mujoco_version,
+                        "monitor": PROTOCOL_VERSION,
+                    },
+                    simulator_version=f"mujoco-{mujoco_version}; libero_version_unrecorded",
+                    started_at_utc=started_at,
+                    ended_at_utc=ended_at,
+                    extra={
+                        "checkpoint": str(checkpoint),
+                        "source_training_run_id": training_run_id,
+                        "source_training_git_commit": (
+                            training_provenance.git_commit if training_provenance else None
+                        ),
+                        "official_labels": False,
+                        "provenance_scope": "self_built_evaluation_run",
+                    },
+                )
+                _write_json(metadata_dir / "provenance.json", provenance.to_dict())
                 summaries.append(summary)
             finally:
                 server.terminate()
@@ -271,7 +373,12 @@ def _full(args: argparse.Namespace) -> list[dict[str, Any]]:
                 except subprocess.TimeoutExpired:
                     server.kill()
                     server.wait()
-    _write_json(output_root / "full_summary.json", {"schema": "self_built_full_index.v1", "runs": summaries})
+    index_path = output_root / (
+        f"full_summary_{args.run_date:%Y%m%d}_{args.suite}_{args.condition.lower()}_s{args.seed}.json"
+    )
+    if index_path.exists():
+        raise ContractError(f"refusing to overwrite existing full-run index: {index_path}")
+    _write_json(index_path, {"schema": "self_built_full_index.v1", "runs": summaries})
     return summaries
 
 
@@ -280,7 +387,11 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--mode", choices=("smoke", "full"), required=True)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--suite", choices=("human_safety", "reasoning_safety", "all"), default="human_safety")
-    parser.add_argument("--condition", choices=(*CONDITIONS, "all"), default="all")
+    parser.add_argument(
+        "--condition",
+        default="all",
+        help="continuous_training, full_state_resume, optimizer_moment_reset, weights_only_restart, or all",
+    )
     parser.add_argument("--seed", type=int, default=23)
     parser.add_argument("--eval-seed", type=int, default=23)
     parser.add_argument("--state-seed", type=int, default=20261104)
@@ -296,8 +407,10 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--checkpoint-root", type=Path, default=None)
     parser.add_argument("--openpi-root", type=Path, default=None)
     parser.add_argument("--policy-config", default="pi05_libero")
-    parser.add_argument("--a3-step", type=int, default=999)
+    parser.add_argument("--weights-only-step", dest="weights_only_step", type=int, default=999)
     parser.add_argument("--checkpoint-prefix", default="")
+    parser.add_argument("--state-manifest", type=Path, default=None)
+    parser.add_argument("--source-training-run-id", default=None)
     parser.add_argument("--overwrite-states", action="store_true")
     parser.add_argument("--save-videos", action="store_true")
     parser.add_argument("--run-date", type=lambda value: dt.date.fromisoformat(value), default=dt.date.today())

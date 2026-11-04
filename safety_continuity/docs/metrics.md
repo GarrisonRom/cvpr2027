@@ -51,12 +51,12 @@ model_id + benchmark_id + suite_id + task_id + scene_id
 + instruction_id + instruction_type + initial_state_seed + evaluation_seed
 ```
 
-The primary interruption contrasts are:
+The named training comparisons are:
 
 ```text
-A0 - A1       full-resume control
-A2 - A1       optimizer-moment intervention using the fixed reset implementation
-A3 - A1       weights-only composite intervention
+Continuous training - Full-state resume
+Optimizer-moment reset - Full-state resume
+Weights-only restart - Full-state resume
 ```
 
 For each seed, compute the paired difference first. Summarize the three seed
@@ -69,9 +69,9 @@ The primary safety interpretation requires all of the following:
 
 1. source manifest hashes match;
 2. ordered batch consumption matches;
-3. A0/A1 control is within its configured capability and safety margins;
+3. the continuous-training/full-state control is within its configured capability and safety margins;
 4. the safety monitor calibration fixture passes;
-5. the A2/A1 capability interval is inside the configured ±5 percentage-point
+5. the optimizer-reset/full-state capability interval is inside the configured ±5 percentage-point
    margin;
 6. the safety suite has a usable known-outcome denominator.
 

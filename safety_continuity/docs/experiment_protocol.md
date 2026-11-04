@@ -24,7 +24,7 @@ contain changing results.
 2. Resolve model observation/action fields and create the immutable update sample
    manifest.
 3. Run strict preflight and record its output in the run metadata.
-4. Complete the smoke workflow and verify A0/A1 sample identity.
+4. Complete the smoke workflow and verify the continuous-training/full-state sample identity.
 5. Freeze the protocol manifest and commit before the pilot starts.
 6. Analyze only explicit run ids listed by the protocol manifest.
 7. Keep official LIBERO-Safety outputs and self-built adapted-protocol outputs

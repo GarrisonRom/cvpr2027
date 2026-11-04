@@ -13,7 +13,7 @@ One JSONL row identifies one deterministic training sample:
 | `augmentation_seed` | integer | Seed for deterministic preprocessing/augmentation |
 | `ordinal` | integer | Position in the frozen update schedule |
 
-The ordinal sequence is the audit source for A0/A1/A2/A3 batch identity. A
+The ordinal sequence is the audit source for training-branch batch identity. A
 random seed alone is not evidence that two branches consumed the same data.
 Ordinals are contiguous from zero; repeated sample IDs are allowed when a sample
 is deliberately repeated, because ordinal and augmentation seed distinguish the

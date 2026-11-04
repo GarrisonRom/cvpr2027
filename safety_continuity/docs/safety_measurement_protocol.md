@@ -19,24 +19,25 @@ does incomplete restoration at the interruption boundary change safety behavior
 relative to a full-state resume, after accounting for ordinary continuous
 training and capability?
 
-The primary contrast is `A2 - A1`, where A2 uses the fixed reset
-implementation:
+The primary contrast is **Optimizer-moment reset vs. Full-state resume**,
+using the fixed reset implementation:
 
-- `A1`: full-state resume;
-- `A2`: full-state resume with only Adam `mu` and `nu` moments reset.
+- **Full-state resume:** restore all saved training state;
+- **Optimizer-moment reset:** restore the same state but reset only Adam `mu` and `nu` moments.
 
-The original A2 runs before commit `07a2936` are invalid for optimizer-moment
-attribution because the reset hook did not traverse Optax namedtuple state.
+Earlier optimizer-moment-reset runs made before commit `07a2936` are invalid for
+optimizer-moment attribution because the reset hook did not traverse Optax
+namedtuple state.
 
 ## Conditions
 
-| Condition | State change | Role |
+| Condition name | State change | Role |
 |---|---|---|
-| `PRE` | Train to the interruption checkpoint | Common branch origin |
-| `A0` | Continuous training; checkpoint write does not stop the process | Continuous baseline |
-| `A1` | Restore all saved training state | Interruption control |
-| `A2` | Reset only optimizer `mu/nu`; preserve step, schedule, RNG, cursor and normalization | Primary causal condition; implementation fixed in `07a2936` |
-| `A3` | Weights-only initialization with the configured fresh trainer state | Composite operational condition |
+| Interruption checkpoint | Train to the interruption point | Common branch origin |
+| Continuous training | Continue without stopping at the interruption point | Continuous baseline |
+| Full-state resume | Restore all saved training state | Interruption control |
+| Optimizer-moment reset | Reset only optimizer moments; preserve step, schedule, RNG, cursor and normalization | Primary causal condition; implementation fixed in `07a2936` |
+| Weights-only restart | Initialize from weights with a fresh trainer state | Composite operational condition |
 
 Every branch consumes the same frozen `UpdateSampleRef` sequence after the
 interruption. A branch without a manifest hash or consumption trace is not
@@ -124,19 +125,26 @@ For a condition and training seed, report:
 The paired effect is computed per training seed first, then summarized across
 the three independent seeds. Episodes are nested observations, not independent
 training repetitions. A safety difference is eligible only when the monitor
-calibration, A0/A1 control, batch audit and capability gate are all available.
+calibration, continuous-training/full-state control, batch audit and capability
+gate are all available.
 
 ## Full Run Outputs
 
 Each self-built run writes:
 
 ```text
+metadata/resolved_config.yaml
 metadata/resolved_config.json
+metadata/provenance.json
 episodes/episodes.jsonl
 episodes/step_traces/steps.jsonl
 metrics/summary.json
 videos/                         # optional
 ```
+
+Legacy evaluator runs created before provenance recording are retained with
+their original configs, episodes and log hashes. Derived analysis bundles mark
+these sources as lacking runtime-specific evaluation provenance.
 
 The state generation output is a separate immutable manifest tree:
 
@@ -156,5 +164,5 @@ Every output carries `protocol: self_built_safety.v1` and
   finding that safety is unchanged.
 - Capability near zero is a capability-floor warning; it prevents a strong
   capability-preservation claim.
-- A2 results from before the named reset fix are retained for audit but excluded
+- Optimizer-moment-reset results from before the named reset fix are retained for audit but excluded
   from the primary effect estimate.

@@ -63,12 +63,9 @@ runtime paths. Warnings for unresolved model fields or a not-yet-created split
 manifest are expected while the GPU-specific adapter inspection is pending. An
 experiment launch must not proceed while the preflight reports an error.
 
-Validate a saved checkpoint inventory against one configured resume condition:
-
-    python safety_continuity/scripts/resume/validate_restore_plan.py --checkpoint-manifest runs/20261104_mvp_pi05_a2_s42/metadata/checkpoint_manifest.json --checkpoint-root checkpoints/training/20261104_mvp_pi05_a2_s42/1000 --condition A2
-
-State file paths are resolved relative to `--checkpoint-root`, which points to
-the actual checkpoint payload directory (not the run metadata directory).
+Checkpoint validation compares the saved state inventory with the selected
+resume plan. State file paths are resolved relative to `--checkpoint-root`,
+which points to the actual checkpoint payload directory.
 
 ## Episode validation and MVP analysis
 
@@ -76,20 +73,20 @@ Validate completed runs by listing each run id explicitly:
 
     python safety_continuity/scripts/analyze/validate_episodes.py --run-id 20261104_mvp_pi05_a1_s42
 
-Generate the paired fixed-A2-versus-A1 analysis by listing all three-seed runs
-for A0, A1 and fixed A2 (each run should contain the configured LIBERO-10 and safety
-benchmark episodes). A0 and A1 are required for the resume-control gate:
-
-    python safety_continuity/scripts/analyze/analyze_mvp.py --run-id 20261104_mvp_pi05_a0_s42 --run-id 20261104_mvp_pi05_a0_s43 --run-id 20261104_mvp_pi05_a0_s44 --run-id 20261104_mvp_pi05_a1_s42 --run-id 20261104_mvp_pi05_a1_s43 --run-id 20261104_mvp_pi05_a1_s44 --run-id 20261104_mvp_pi05_a2fix_s42 --run-id 20261104_mvp_pi05_a2fix_s43 --run-id 20261104_mvp_pi05_a2fix_s44 --analysis-id 20261104_analysis_pi05_a2fix_s00
+The primary comparison is **Optimizer-moment reset vs. Full-state resume**.
+The control compares **Continuous training vs. Full-state resume**. For the
+current trained matrix, use the completion command below; it assembles the
+separately recorded evaluator outputs without rewriting their source runs.
 
 The analysis writes a new, immutable directory under `runs/<analysis_id>/` with
 source hashes, run summaries, seed-level paired effects, and pilot bootstrap
 intervals. It also verifies the frozen and actually consumed batch sequence for
-A0/A1 and fixed-A2/A1, evaluates the configured A0/A1 safety/capability control, and
-checks the primary LIBERO-10 capability interval against its equivalence margin.
+both paired comparisons, evaluates the configured control, and checks the
+primary LIBERO-10 capability interval against its equivalence margin.
 The primary signal is supported only when the safety threshold, batch audits,
-capability gate and A0/A1 control all pass. It checks completed-run provenance
-and the resolved-config hash, and refuses to reuse an existing analysis id. The
+capability gate and continuous-training/full-state control all pass. Analysis
+checks completed-run provenance and the resolved-config hash, and refuses to
+reuse an existing analysis id. The
 pilot screens are descriptive and are not formal equivalence tests.
 
 ## OpenPI MVP runner
@@ -97,18 +94,17 @@ pilot screens are descriptive and are not formal equivalence tests.
 The executable GPU runner is `scripts/train/openpi_mvp.py`. It selects the first
 available demonstration episode for each official LIBERO-10 task, freezes a
 2,000-sample schedule, forces `shuffle=False`, records every consumed sample,
-and supports `PRE`, `A0`, `A1`, `A2` and `A3` stages. The released safety
+and supports interruption checkpoint, continuous training, full-state resume,
+optimizer-moment reset and weights-only restart stages. The released safety
 checkpoint is trained through its native `action_out_proj` subset because the
 official LoRA configuration adds modules absent from the checkpoint.
 
-The runner expects OpenPI in an external checkout and uses the runtime roots
-from the shell. A typical GPU invocation is:
-
-    PYTHONPATH=/root/cvpr2027/safety_continuity/src /root/openpi-venv-compatible/bin/python safety_continuity/scripts/train/openpi_mvp.py --openpi-root /root/openpi --payload-root /root/autodl-tmp/cvpr2027-payloads --run-id 20261104_mvp_pi05_pre_s42 --condition PRE --seed 42 --total-steps 1000 --schedule-count 1000 --schedule-path /root/autodl-tmp/cvpr2027-payloads/data/splits/mvp_update_samples_s42.jsonl --selected-episodes 0 1 2 6 7 8 10 12 14 27 --checkpoint-name pre_s42
-
-The interruption branches reuse the resulting checkpoint directory with
+The runner expects OpenPI in an external checkout and uses runtime roots from
+the shell. Interruption branches reuse the branch-origin checkpoint with
 `--resume` or `--source-checkpoint-dir`; their metadata and batch-consumption
-records are required inputs to analysis.
+records are required inputs to analysis. Machine condition identifiers remain
+inside configs and run records for compatibility; user-facing reports use the
+English names above.
 
 ## Self-built safety MVP runner
 
@@ -120,7 +116,7 @@ Run the CPU-only contract smoke:
 
     python safety_continuity/scripts/evaluate/run_self_built_mvp.py --mode smoke --output-root runs/self_built_smoke
 
-Run all A0/A1/A2/A3 conditions for one seed and suite on a GPU instance:
+Run all supported conditions for one seed and suite on a GPU instance:
 
     python safety_continuity/scripts/evaluate/run_self_built_mvp.py --mode full --suite human_safety --condition all --seed 42 --payload-root /root/autodl-tmp/cvpr2027-payloads --checkpoint-root /root/autodl-tmp/cvpr2027-payloads/checkpoints --openpi-root /root/openpi --output-root /root/autodl-tmp/cvpr2027-payloads/runs/self_built_human_s42
 
@@ -129,28 +125,27 @@ dependencies in the selected environment. Generated labels use
 `self_built_rules.v1`; they are valid for paired adapted-protocol analysis and
 must not be reported as official LIBERO-Safety unsafe rates.
 
-## One-command unattended MVP
+## Complete The Existing MVP
 
-Use `scripts/evaluate/run_mvp_unattended.py` when the complete seed matrix
-should run without interactive supervision. It runs training, capability
-evaluation and both self-built safety suites serially. Each stage has its own
-log; an existing run/output is never overwritten. The final gate is
-`needs_review` by default because self-built monitor calibration must be
-explicitly supplied before a safety claim is allowed.
+The three-seed training matrix and initial evaluations are already available
+on the current AutoDL instance. This command runs the missing fixed optimizer
+intervention safety evaluations, verifies pairing, validates episodes, runs
+the paired analysis and writes a machine-readable review gate. It does not
+retrain completed checkpoints.
 
 ```bash
-nohup python safety_continuity/scripts/evaluate/run_mvp_unattended.py \
-  --mode all \
-  --payload-root /root/autodl-tmp/cvpr2027-payloads \
-  --openpi-root /root/openpi \
-  --libero-root /root/LIBERO-classic \
-  --libero-config /root/libero-classic-config \
-  > /root/autodl-tmp/cvpr2027-payloads/runs/unattended_mvp.log 2>&1 &
+python safety_continuity/scripts/evaluate/complete_existing_mvp.py \
+  --payload-root /root/autodl-tmp/cvpr2027_RoBo/cvpr2027-payloads \
+  --openpi-root /root/autodl-tmp/cvpr2027_RoBo/openpi \
+  --repo-root /root/autodl-tmp/cvpr2027
 ```
 
-The script reports possible A2-versus-A1 risk differences but never edits or
-"repairs" a checkpoint automatically. A result requiring intervention is
-written to `unattended_mvp_gate_<date>.json`.
+The report and plots use descriptive English condition names. Historical run
+IDs remain unchanged as provenance identifiers. A `needs_review` result means
+the evidence is incomplete or a possible regression signal was found;
+`no_threshold_signal` is not proof of safety. The generated monitor fixtures
+exercise decision rules only and do not calibrate contact extraction in the
+simulator.
 
 ## AutoDL runtime layout
 

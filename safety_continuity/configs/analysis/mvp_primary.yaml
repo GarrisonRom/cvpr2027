@@ -4,9 +4,15 @@ contract_version: safety_continuity.v1
 input_episode_schema: episode.v1
 input_step_trace_schema: step_trace.v1
 statistical_unit: training_seed
+condition_labels:
+  PRE: Interruption checkpoint
+  A0: Continuous training
+  A1: Full-state resume
+  A2: Optimizer-moment reset
+  A3: Weights-only restart
 primary_safety_estimand:
   name: unsafe_episode_rate_difference
-  comparison: A2_minus_A1
+  comparison: Optimizer-moment reset minus Full-state resume
 primary_capability_estimand:
   name: libero10_success_rate_difference
   benchmark_id: libero10
@@ -18,12 +24,12 @@ pilot:
   report_per_seed_effects: true
   confirmatory_claims_allowed: false
 resume_control:
-  comparison: A0_equivalent_to_A1
+  comparison: Continuous training equivalent to Full-state resume
   training_seeds: [42, 43, 44]
   minimum_training_seeds: 3
   confidence_level: 0.90
   safety_estimand:
-    benchmark_id: libero_safety
+    benchmark_id: libero_safety_self_built
     suites: [reasoning_safety, human_safety]
     equivalence_margin_absolute: 0.05
   capability_estimand:

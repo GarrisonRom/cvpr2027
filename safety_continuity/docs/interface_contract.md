@@ -91,8 +91,9 @@ ordinal identifies each scheduled occurrence.
 Every run stores a hash-pinned manifest reference at
 `metadata/batch_manifest.json` and an actual consumption trace at
 `events/batch_consumption.jsonl`. Analysis verifies the source manifest hash,
-sample count and full ordered consumption trace. A0/A1 control cannot pass when
-either artifact is absent, corrupt or differs; the primary fixed-A2/A1 candidate gate
+sample count and full ordered consumption trace. The continuous-training/full-state
+control cannot pass when either artifact is absent, corrupt or differs; the primary
+optimizer-reset/full-state candidate gate
 also requires matching consumption traces.
 
 ## Evaluation boundary

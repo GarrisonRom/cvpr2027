@@ -153,6 +153,44 @@ def parse_comparison(value: str) -> tuple[str, str]:
     return target, reference
 
 
+def condition_id_for_label(value: str, condition_labels: Mapping[str, str]) -> str:
+    if not isinstance(condition_labels, Mapping) or any(
+        not isinstance(key, str) or not isinstance(label, str) or not label.strip()
+        for key, label in condition_labels.items()
+    ):
+        raise ContractError("condition_labels must map condition ids to non-empty display names")
+    candidate = value.strip()
+    if candidate in condition_labels:
+        return candidate
+    reverse = {
+        label.strip().casefold(): condition_id
+        for condition_id, label in condition_labels.items()
+    }
+    try:
+        return reverse[candidate.casefold()]
+    except KeyError as exc:
+        raise ContractError(f"unknown condition name: {value!r}") from exc
+
+
+def parse_condition_relation(
+    value: str,
+    condition_labels: Mapping[str, str],
+    *,
+    relation: str,
+    legacy_relation: str,
+) -> tuple[str, str]:
+    parts = value.split(relation)
+    if len(parts) != 2:
+        parts = value.split(legacy_relation)
+    if len(parts) != 2 or not all(part.strip() for part in parts):
+        raise ContractError(f"condition relation must contain {relation.strip()!r}")
+    left = condition_id_for_label(parts[0], condition_labels)
+    right = condition_id_for_label(parts[1], condition_labels)
+    if left == right:
+        raise ContractError("condition relation must name two different conditions")
+    return left, right
+
+
 def paired_comparison(
     records: Sequence[EpisodeRecord],
     *,
@@ -921,17 +959,21 @@ def analyze_runs(
     roots = RuntimeRoots.from_env(workspace_root)
     analysis_config = load_yaml(config_path)
     target, reference = parse_comparison(comparison)
-    configured_primary = analysis_config["primary_safety_estimand"]["comparison"]
-    primary_target, primary_reference = parse_comparison(
-        configured_primary.replace("_minus_", ":")
+    condition_labels = analysis_config.get("condition_labels", {})
+    configured_primary = str(analysis_config["primary_safety_estimand"]["comparison"])
+    primary_target, primary_reference = parse_condition_relation(
+        configured_primary,
+        condition_labels,
+        relation=" minus ",
+        legacy_relation="_minus_",
     )
     control_config = analysis_config["resume_control"]
-    control_parts = str(control_config["comparison"]).split("_equivalent_to_")
-    if len(control_parts) != 2 or not all(part.strip() for part in control_parts):
-        raise ContractError("resume_control.comparison must use TARGET_equivalent_to_REFERENCE")
-    control_target, control_reference = (part.strip() for part in control_parts)
-    if control_target == control_reference:
-        raise ContractError("resume control must compare two distinct conditions")
+    control_target, control_reference = parse_condition_relation(
+        str(control_config["comparison"]),
+        condition_labels,
+        relation=" equivalent to ",
+        legacy_relation="_equivalent_to_",
+    )
     candidate_config = analysis_config["candidate_signal"]
     if candidate_config.get("required_control") != "resume_control.comparison":
         raise ContractError("candidate signal must require the configured resume control")
@@ -1193,6 +1235,45 @@ def analyze_runs(
         and primary_batch_result["status"] == "pass"
     )
 
+    condition_labels = analysis_config.get("condition_labels", {})
+    if not isinstance(condition_labels, Mapping) or any(
+        not isinstance(key, str) or not isinstance(value, str) or not value.strip()
+        for key, value in condition_labels.items()
+    ):
+        raise ContractError("condition_labels must map condition ids to non-empty display names")
+
+    def add_condition_labels(row: dict[str, Any]) -> None:
+        for field, label_field in (
+            ("condition_id", "condition_label"),
+            ("target_condition", "target_condition_label"),
+            ("reference_condition", "reference_condition_label"),
+        ):
+            value = row.get(field)
+            if value is not None:
+                row[label_field] = condition_labels.get(value, value)
+
+    for collection in (
+        run_summary,
+        safety_rows,
+        capability_rows,
+        control_rows,
+        control_batch_rows,
+        primary_capability_rows,
+        primary_batch_rows,
+        control_safety_rows,
+        control_capability_rows,
+    ):
+        for row in collection:
+            add_condition_labels(row)
+    for result in (
+        resume_control_result,
+        primary_capability_result,
+        primary_batch_result,
+        control_batch_result,
+        candidate_result,
+    ):
+        add_condition_labels(result)
+
     root = Path(output_root).expanduser().resolve() if output_root else roots.run_root
     output_dir = root / analysis_id
     output_dir.mkdir(parents=True, exist_ok=False)
@@ -1207,6 +1288,11 @@ def analyze_runs(
             "analysis_id": analysis_id,
             "source_run_ids": list(run_ids),
             "comparison": {"target": target, "reference": reference},
+            "display_comparison": {
+                "target": condition_labels.get(target, target),
+                "reference": condition_labels.get(reference, reference),
+            },
+            "condition_labels": dict(condition_labels),
             "resume_control_comparison": {
                 "target": control_target,
                 "reference": control_reference,
@@ -1245,6 +1331,11 @@ def analyze_runs(
             )
         },
         "comparison": {"target": target, "reference": reference},
+        "display_comparison": {
+            "target": condition_labels.get(target, target),
+            "reference": condition_labels.get(reference, reference),
+        },
+        "condition_labels": dict(condition_labels),
         "resume_control_comparison": {
             "target": control_target,
             "reference": control_reference,

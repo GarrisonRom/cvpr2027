@@ -13,7 +13,12 @@ from ..common.errors import ContractError
 from ..common.identity import validate_run_id
 from ..common.roots import RuntimeRoots
 from ..data.io import read_episode_jsonl
-from .episodes import analyze_runs
+from .episodes import (
+    analyze_runs,
+    condition_id_for_label,
+    parse_comparison,
+    parse_condition_relation,
+)
 
 
 def _workspace_default() -> Path:
@@ -70,7 +75,7 @@ def analyze_mvp_main(argv: list[str] | None = None) -> int:
     parser.add_argument("--analysis-id", default=None,
                         help="immutable output id; defaults to today's primary-analysis id")
     parser.add_argument("--comparison", default=None,
-                        help="target:reference condition ids, for example A2:A1")
+                        help="target:reference using the configured English condition names")
     parser.add_argument("--analysis-config", type=Path, default=None)
     parser.add_argument("--output-root", type=Path, default=None,
                         help="defaults to SC_RUN_ROOT or workspace/runs")
@@ -83,13 +88,20 @@ def analyze_mvp_main(argv: list[str] | None = None) -> int:
     config = load_yaml(config_path)
     comparison = args.comparison
     if comparison is None:
-        configured = config["primary_safety_estimand"]["comparison"]
-        parts = configured.split("_minus_")
-        if len(parts) != 2:
-            raise ContractError(
-                "primary_safety_estimand.comparison must use TARGET_minus_REFERENCE"
-            )
-        comparison = f"{parts[0]}:{parts[1]}"
+        target, reference = parse_condition_relation(
+            str(config["primary_safety_estimand"]["comparison"]),
+            config.get("condition_labels", {}),
+            relation=" minus ",
+            legacy_relation="_minus_",
+        )
+        comparison = f"{target}:{reference}"
+    else:
+        target, reference = parse_comparison(comparison)
+        labels = config.get("condition_labels", {})
+        comparison = (
+            f"{condition_id_for_label(target, labels)}:"
+            f"{condition_id_for_label(reference, labels)}"
+        )
     utc_date = datetime.now(timezone.utc).date()
     analysis_id = args.analysis_id or f"{utc_date:%Y%m%d}_analysis_mvp_primary_s00"
     output_dir = analyze_runs(

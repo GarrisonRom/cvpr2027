@@ -19,8 +19,8 @@ Starting from one safety-trained π0.5 checkpoint and one frozen benign update
 schedule, does losing optimizer moments at an interruption change safety
 behavior relative to a full-state resume?
 
-The primary estimand is `A2 - A1` safety risk, using the fixed reset
-implementation from commit `07a2936`. Capability is a separate
+The primary estimand is optimizer-moment reset minus full-state resume safety
+risk, using the fixed reset implementation from commit `07a2936`. Capability is a separate
 equivalence gate. The experiment is not designed to maximize task success.
 
 ## Frozen Matrix
@@ -37,27 +37,28 @@ equivalence gate. The experiment is not designed to maximize task success.
 | Capability suite | official LIBERO-10, 10 tasks |
 | Self-built safety suites | `human_safety`, `reasoning_safety`, L1 |
 | Pairing | same task, state seed, instruction and evaluator seed |
-| Primary optimizer condition | `A2` using the fixed reset implementation; pre-fix A2 is excluded |
+| Primary optimizer condition | Optimizer-moment reset using the fixed implementation; runs before the fix are excluded |
 
 The old `11/23/37` runs remain immutable historical artifacts. They are not
 part of the current primary seed set.
 
 ## Training Conditions
 
-`PRE` trains to the interruption checkpoint and is the branch origin.
+`Interruption checkpoint` trains to the interruption point and is the branch
+origin.
 
-`A0` trains continuously for 2,000 steps. A checkpoint may be written at step
+`Continuous training` runs for 2,000 steps without interruption. A checkpoint may be written at step
 1,000, but the process does not stop.
 
-`A1` restores the complete checkpoint state after step 1,000 and executes the
+`Full-state resume` restores the complete checkpoint state after step 1,000 and executes the
 remaining 1,000 steps.
 
-`A2` restores the same state but zeros only Adam `mu` and `nu` PyTree leaves.
+`Optimizer-moment reset` restores the same state but zeros only Adam `mu` and `nu` PyTree leaves.
 Optimizer count, schedule/global step, RNG, batch cursor, normalization and
-gradient accumulation are preserved. Every fixed A2 run writes
+gradient accumulation are preserved. Every optimizer-moment reset run writes
 `events/optimizer_moments_reset.json`.
 
-`A3` loads PRE weights as a weights-only initialization. Its fresh trainer state
+`Weights-only restart` loads interruption-checkpoint weights as a weights-only initialization. Its fresh trainer state
 is a composite operational condition and is not used to attribute an
 optimizer-only effect.
 
@@ -79,7 +80,7 @@ For each suite and seed:
 
 1. Discover the fixed L1 task list from the installed LIBERO-Safety registry.
 2. Generate one immutable state manifest using seeded MuJoCo reset.
-3. Reuse that exact manifest across A0/A1/A2/A3.
+3. Reuse that exact manifest across all training conditions.
 4. Start one OpenPI policy server at a time.
 5. Record every action, monitor margin, contact count, policy version and state
    reference.
@@ -113,14 +114,15 @@ separate the fixtures, the run remains an engineering diagnostic.
 The primary analysis is admitted only when:
 
 1. selected run schemas validate;
-2. A0/A1 and A2/A1 manifests and consumption sequences match;
-3. the A0/A1 resume control is interpretable;
+2. Continuous-training/full-state and optimizer-reset/full-state manifests and consumption sequences match;
+3. the continuous-training/full-state control is interpretable;
 4. the capability interval is available and reported;
 5. monitor calibration is available;
 6. official and self-built labels remain in separate benchmark IDs.
 
 The primary safety output is the per-seed paired difference in known-outcome
-unsafe episode rate, followed by a training-seed cluster interval. A candidate
+unsafe episode rate between optimizer-moment reset and full-state resume,
+followed by a training-seed cluster interval. A candidate
 signal requires the configured direction, magnitude and seed-count rules in
 `configs/analysis/mvp_primary.yaml`. It is exploratory pilot evidence, not a
 universal claim.
@@ -149,13 +151,13 @@ videos/                         # optional
 
 ## Interpretation Limits
 
-- Pre-fix A2 is invalid for optimizer-moment attribution.
+- Runs made before the optimizer-state reset fix are invalid for optimizer-moment attribution.
 - Self-built labels cannot be described as official LIBERO-Safety metrics.
 - A flat safety label pattern is a monitor-sensitivity warning, not evidence of
   no safety drift.
 - Capability near zero prevents a claim that safety changed while capability
   was preserved.
-- A3 is a composite fault and cannot identify the optimizer as the cause.
+- Weights-only restart is a composite fault and cannot identify the optimizer as the cause.
 
 ## Single Entry Point
 
@@ -177,3 +179,19 @@ python safety_continuity/scripts/evaluate/run_self_built_mvp.py \
   --openpi-root /root/openpi \
   --output-root /root/autodl-tmp/cvpr2027-payloads/runs/self_built_human_s42
 ```
+
+## Completing The Existing Run Set
+
+The trained matrix and initial evaluator jobs are already present on the
+current AutoDL instance. Finish the corrected optimizer-moment condition,
+combine it with paired capability and safety records, validate the bundle, run
+the primary comparison and continuous-training control, and write a review
+gate with one command.
+
+`python safety_continuity/scripts/evaluate/complete_existing_mvp.py --payload-root /root/autodl-tmp/cvpr2027_RoBo/cvpr2027-payloads --openpi-root /root/autodl-tmp/cvpr2027_RoBo/openpi --repo-root /root/autodl-tmp/cvpr2027`
+
+The final report uses descriptive English condition names. Existing run IDs are
+retained as provenance identifiers. `needs_review` means evidence is
+incomplete or a possible safety signal was found; `no_threshold_signal` does
+not prove safety. The generated contact/action fixtures exercise rule logic
+only and do not validate contact extraction from the live simulator.
