@@ -87,9 +87,10 @@ def _run_id(condition: str, seed: int, run_date: dt.date) -> str:
     return f"{run_date:%Y%m%d}_mvp_pi05_{condition.lower()}_s{seed}"
 
 
-def _checkpoint(payload: Path, condition: str, seed: int) -> Path:
+def _checkpoint(payload: Path, condition: str, seed: int, checkpoint_prefix: str) -> Path:
     step = 999 if condition == "A3" else 1999
-    path = payload / "checkpoints" / "openpi_mvp" / "pi05_libero_mvp" / f"{condition.lower()}_s{seed}" / str(step)
+    name = f"{checkpoint_prefix}_{condition.lower()}_s{seed}"
+    path = payload / "checkpoints" / "openpi_mvp" / "pi05_libero_mvp" / name / str(step)
     if not path.is_dir():
         raise ContractError(f"required checkpoint is missing: {path}")
     return path
@@ -132,7 +133,7 @@ def _train_matrix(args: argparse.Namespace, env: dict[str, str], log: Path) -> l
               source: Path | None = None, resume: bool = False, reset: bool = False) -> None:
         run_id = _run_id(condition, seed, args.run_date)
         run_dir = payload / "runs" / run_id
-        checkpoint = payload / "checkpoints" / "openpi_mvp" / "pi05_libero_mvp" / f"{condition.lower()}_s{seed}"
+        checkpoint = payload / "checkpoints" / "openpi_mvp" / "pi05_libero_mvp" / f"{args.experiment_tag}_{condition.lower()}_s{seed}"
         final_step = 999 if condition in {"PRE", "A3"} else 1999
         if run_dir.exists() or (checkpoint / str(final_step)).exists():
             raise ContractError(f"refusing to overwrite existing stage: {run_id} / {checkpoint}")
@@ -144,7 +145,7 @@ def _train_matrix(args: argparse.Namespace, env: dict[str, str], log: Path) -> l
             "--schedule-count", str(count), "--optimizer-step-start", str(step_start),
             "--schedule-path", str(_ensure_schedule(args, seed, runner)),
             "--selected-episodes", *[str(value) for value in SELECTED_EPISODES],
-            "--checkpoint-name", f"{condition.lower()}_s{seed}",
+            "--checkpoint-name", f"{args.experiment_tag}_{condition.lower()}_s{seed}",
         ]
         if source is not None:
             command += ["--source-checkpoint-dir", str(source)]
@@ -161,9 +162,9 @@ def _train_matrix(args: argparse.Namespace, env: dict[str, str], log: Path) -> l
     for seed in args.seeds:
         train("PRE", seed, total=1000, start=0, count=1000, step_start=0)
         train("A0", seed, total=2000, start=0, count=2000, step_start=0)
-        pre = payload / "checkpoints" / "openpi_mvp" / "pi05_libero_mvp" / f"pre_s{seed}"
+        pre = payload / "checkpoints" / "openpi_mvp" / "pi05_libero_mvp" / f"{args.experiment_tag}_pre_s{seed}"
         for condition in ("A1", "A2"):
-            branch = payload / "checkpoints" / "openpi_mvp" / "pi05_libero_mvp" / f"{condition.lower()}_s{seed}"
+            branch = payload / "checkpoints" / "openpi_mvp" / "pi05_libero_mvp" / f"{args.experiment_tag}_{condition.lower()}_s{seed}"
             shutil.copytree(pre, branch)
             train(condition, seed, total=2000, start=1000, count=1000, step_start=1000,
                   source=branch, resume=True, reset=condition == "A2")
@@ -225,7 +226,7 @@ def _evaluate_capability(args: argparse.Namespace, env: dict[str, str]) -> list[
     eval_env["PYTHONPATH"] = f"{args.libero_root}{os.pathsep}{args.openpi_root / 'src'}"
     for seed in args.seeds:
         for condition in ("A0", "A1", "A2", "A3"):
-            checkpoint = _checkpoint(args.payload_root, condition, seed, 999)
+            checkpoint = _checkpoint(args.payload_root, condition, seed, args.experiment_tag)
             _ensure_norm_stats(checkpoint)
             run_id = _run_id(condition, seed, args.run_date)
             if (args.payload_root / "runs" / run_id).exists():
@@ -273,6 +274,7 @@ def _evaluate_self_built(args: argparse.Namespace, env: dict[str, str]) -> dict[
                 "--condition", "all", "--seed", str(seed), "--eval-seed", str(seed),
                 "--states-per-task", str(args.states_per_task),
                 "--episodes-per-task", str(args.episodes_per_task),
+                "--checkpoint-prefix", args.experiment_tag,
                 "--payload-root", str(args.payload_root),
                 "--checkpoint-root", str(args.payload_root / "checkpoints"),
                 "--openpi-root", str(args.openpi_root), "--output-root", str(output_root),
@@ -346,6 +348,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--seeds", type=int, nargs="+", default=[42, 43, 44])
     parser.add_argument("--port", type=int, default=18000)
     parser.add_argument("--run-date", type=lambda value: dt.date.fromisoformat(value), default=dt.date.today())
+    parser.add_argument("--experiment-tag", default="unattended")
     parser.add_argument("--skip-capability", action="store_true")
     parser.add_argument("--skip-safety", action="store_true")
     parser.add_argument("--states-per-task", type=int, default=10)

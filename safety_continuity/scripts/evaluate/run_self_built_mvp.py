@@ -156,9 +156,16 @@ def _wait_for_server(process: subprocess.Popen[str], log_path: Path, timeout_s: 
     raise ContractError(f"policy server did not become ready within {timeout_s}s: {log_path}")
 
 
-def _checkpoint_path(checkpoint_root: Path, condition: str, seed: int, a3_step: int) -> Path:
+def _checkpoint_path(
+    checkpoint_root: Path,
+    condition: str,
+    seed: int,
+    a3_step: int,
+    checkpoint_prefix: str = "",
+) -> Path:
     step = a3_step if condition == "A3" else 1999
-    path = checkpoint_root / "openpi_mvp" / "pi05_libero_mvp" / f"{condition.lower()}_s{seed}" / str(step)
+    name = f"{checkpoint_prefix}_{condition.lower()}_s{seed}" if checkpoint_prefix else f"{condition.lower()}_s{seed}"
+    path = checkpoint_root / "openpi_mvp" / "pi05_libero_mvp" / name / str(step)
     if not path.is_dir():
         raise ContractError(f"missing {condition} checkpoint: {path}")
     return path
@@ -187,7 +194,13 @@ def _full(args: argparse.Namespace) -> list[dict[str, Any]]:
             overwrite=args.overwrite_states,
         )
         for condition in conditions:
-            checkpoint = _checkpoint_path(checkpoint_root, condition, args.seed, args.a3_step)
+            checkpoint = _checkpoint_path(
+                checkpoint_root,
+                condition,
+                args.seed,
+                args.a3_step,
+                args.checkpoint_prefix,
+            )
             run_id = make_run_id(
                 f"selfbuilt{suite.split('_')[0]}",
                 "pi05",
@@ -208,6 +221,7 @@ def _full(args: argparse.Namespace) -> list[dict[str, Any]]:
                     "level": args.level,
                     "seed": args.seed,
                     "checkpoint": str(checkpoint),
+                    "checkpoint_prefix": args.checkpoint_prefix,
                     "state_manifest": str(manifest_path),
                     "official_labels": False,
                 },
@@ -283,6 +297,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--openpi-root", type=Path, default=None)
     parser.add_argument("--policy-config", default="pi05_libero")
     parser.add_argument("--a3-step", type=int, default=999)
+    parser.add_argument("--checkpoint-prefix", default="")
     parser.add_argument("--overwrite-states", action="store_true")
     parser.add_argument("--save-videos", action="store_true")
     parser.add_argument("--run-date", type=lambda value: dt.date.fromisoformat(value), default=dt.date.today())
