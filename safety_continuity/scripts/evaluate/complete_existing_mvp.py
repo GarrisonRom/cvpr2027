@@ -7,6 +7,7 @@ import datetime as dt
 import json
 import os
 import re
+import socket
 import subprocess
 import sys
 from dataclasses import replace
@@ -199,6 +200,107 @@ def _read_manifest_from_run(run_dir: Path) -> tuple[dict[str, Any], Path, dict[s
     return config, manifest_path, manifest
 
 
+def _preflight_existing_sources(args: argparse.Namespace, tag: str) -> None:
+    capability_pair_keys: dict[int, set[tuple[Any, ...]]] = {}
+    for condition in CONDITIONS:
+        for seed in SEEDS:
+            training_run_id = _source_training_run_id(args, condition, seed)
+            training_dir = args.payload_root / "runs" / training_run_id
+            config_path = training_dir / "metadata" / "resolved_config.yaml"
+            provenance_path = training_dir / "metadata" / "provenance.json"
+            required = (
+                config_path,
+                provenance_path,
+                training_dir / "metadata" / "batch_manifest.json",
+                training_dir / "events" / "batch_consumption.jsonl",
+                training_dir / "episodes" / "episodes.jsonl",
+                _training_checkpoint(args, condition, seed),
+            )
+            missing = [str(path) for path in required if not path.exists()]
+            if missing:
+                raise ContractError(f"required source artifacts missing for {training_run_id}: {missing}")
+            config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+            provenance = provenance_from_mapping(_json(provenance_path))
+            if (
+                config.get("condition") != condition
+                or config.get("seed") != seed
+                or provenance.model_seed != seed
+                or provenance.model_id != "pi05_libero_safety"
+            ):
+                raise ContractError(f"training source identity mismatch: {training_run_id}")
+            capability_rows = [
+                row for row in _record_rows(
+                    training_dir / "episodes" / "episodes.jsonl",
+                    run_id=training_run_id,
+                )
+                if row.benchmark_id == "libero10"
+            ]
+            if not capability_rows:
+                raise ContractError(f"LIBERO-10 capability records missing for {training_run_id}")
+            keys = {
+                (
+                    row.benchmark_id, row.suite_id, row.task_id, row.scene_id,
+                    row.instruction_id, row.instruction_type,
+                    row.initial_state_seed, row.evaluation_seed,
+                )
+                for row in capability_rows
+            }
+            if seed in capability_pair_keys and keys != capability_pair_keys[seed]:
+                raise ContractError(
+                    f"seed {seed}: capability sources are not paired on identical LIBERO-10 cases"
+                )
+            capability_pair_keys[seed] = keys
+
+    for suite in SUITES:
+        for seed in SEEDS:
+            reference_keys: set[tuple[Any, ...]] | None = None
+            for condition in ("A0", "A1", "A3"):
+                run_dir = _source_safety_dir(
+                    args, suite=suite, condition=condition, seed=seed, tag=tag,
+                )
+                config, _, manifest = _read_manifest_from_run(run_dir)
+                if config.get("condition") != condition or config.get("seed") != seed:
+                    raise ContractError(f"safety source identity mismatch: {run_dir}")
+                for rel in (
+                    "episodes/episodes.jsonl",
+                    "metrics/summary.json",
+                    "logs/policy_server.log",
+                ):
+                    if not (run_dir / rel).is_file():
+                        raise ContractError(f"required safety source file missing: {run_dir / rel}")
+                for task in manifest["tasks"]:
+                    state_path = Path(task["state_path"])
+                    if not state_path.is_file() or sha256_file(state_path) != task["state_sha256"]:
+                        raise ContractError(f"state payload missing or corrupt: {state_path}")
+                rows = _record_rows(
+                    run_dir / "episodes" / "episodes.jsonl",
+                    run_id=config["run_id"],
+                )
+                expected_count = len(manifest["tasks"]) * int(manifest["states_per_task"])
+                if len(rows) != expected_count:
+                    raise ContractError(
+                        f"{run_dir}: expected {expected_count} safety episodes, found {len(rows)}"
+                    )
+                keys = {
+                    (
+                        row.task_id, row.scene_id, row.instruction_id,
+                        row.instruction_type, row.initial_state_seed, row.evaluation_seed,
+                    )
+                    for row in rows
+                }
+                if reference_keys is None:
+                    reference_keys = keys
+                elif keys != reference_keys:
+                    raise ContractError(
+                        f"{suite} seed {seed}: existing safety runs are not paired on identical episodes"
+                    )
+    with socket.socket() as sock:
+        try:
+            sock.bind(("127.0.0.1", args.port))
+        except OSError as exc:
+            raise ContractError(f"local evaluation port {args.port} is already in use") from exc
+
+
 def _run_a2fix_safety(args: argparse.Namespace, env: dict[str, str], tag: str, log_root: Path) -> list[Path]:
     runner = args.repo_root / "scripts" / "evaluate" / "run_self_built_mvp.py"
     python = args.openpi_root / ".venv" / "bin" / "python"
@@ -212,6 +314,10 @@ def _run_a2fix_safety(args: argparse.Namespace, env: dict[str, str], tag: str, l
             states_per_task = int(manifest["states_per_task"])
             if states_per_task <= 0 or not manifest.get("tasks"):
                 raise ContractError(f"invalid reference state manifest: {state_manifest_path}")
+            for task in manifest["tasks"]:
+                state_path = Path(task["state_path"])
+                if not state_path.is_file() or sha256_file(state_path) != task["state_sha256"]:
+                    raise ContractError(f"reference state payload missing or corrupt: {state_path}")
             training_run_id = _source_training_run_id(args, "A2", seed)
             checkpoint = _training_checkpoint(args, "A2", seed)
             if not checkpoint.is_dir():
@@ -830,6 +936,7 @@ def main() -> int:
     env = _runtime_env(args)
     log_root = final_root / "logs"
     final_root.mkdir(parents=True, exist_ok=True)
+    _preflight_existing_sources(args, tag)
     safety_runs = _run_a2fix_safety(args, env, tag, log_root)
     state_audit = _verify_state_pairing(args, tag)
 
