@@ -228,6 +228,8 @@ def _evaluate_capability(args: argparse.Namespace, env: dict[str, str]) -> list[
             checkpoint = _checkpoint(args.payload_root, condition, seed, 999)
             _ensure_norm_stats(checkpoint)
             run_id = _run_id(condition, seed, args.run_date)
+            if (args.payload_root / "runs" / run_id).exists():
+                raise ContractError(f"refusing to overwrite existing capability run: {run_id}")
             server_log = args.payload_root / "runs" / f"policy_{condition.lower()}_s{seed}.log"
             eval_log = args.payload_root / "runs" / f"eval_{condition.lower()}_s{seed}.log"
             video_dir = args.payload_root / "runs" / f"eval_{condition.lower()}_s{seed}" / "videos"
@@ -327,6 +329,8 @@ def _evaluate_self_built(args: argparse.Namespace, env: dict[str, str]) -> dict[
 
 def _write_gate(args: argparse.Namespace, status: str, details: dict[str, Any]) -> Path:
     path = args.payload_root / "runs" / f"unattended_mvp_gate_{args.run_date:%Y%m%d}.json"
+    if path.exists():
+        raise ContractError(f"refusing to overwrite existing unattended gate: {path}")
     _write_json(path, {"schema": "unattended_mvp_gate.v1", "status": status, "details": details})
     return path
 
