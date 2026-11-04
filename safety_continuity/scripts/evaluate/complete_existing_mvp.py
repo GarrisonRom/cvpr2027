@@ -18,6 +18,7 @@ import yaml
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+WORKSPACE_ROOT = PROJECT_ROOT.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from safety_continuity.common.config import sha256_file, sha256_payload
@@ -78,6 +79,15 @@ def _tag(value: str) -> str:
     if not result:
         raise ContractError("experiment tag must contain lowercase ASCII letters or digits")
     return result
+
+
+def _safety_project_root(workspace_root: Path) -> Path:
+    if (workspace_root / "src" / "safety_continuity").is_dir() and (workspace_root / "configs").is_dir():
+        return workspace_root
+    candidate = workspace_root / "safety_continuity"
+    if (candidate / "src" / "safety_continuity").is_dir() and (candidate / "configs").is_dir():
+        return candidate
+    raise ContractError(f"safety_continuity project not found under {workspace_root}")
 
 
 def _bundle_run_id(run_date: dt.date, tag: str, condition: str, seed: int) -> str:
@@ -141,6 +151,7 @@ def _current_code_identity(repo_root: Path) -> tuple[str, bool]:
 
 def _runtime_env(args: argparse.Namespace) -> dict[str, str]:
     payload = args.payload_root
+    project_root = _safety_project_root(args.repo_root)
     commit, dirty = _current_code_identity(args.repo_root)
     env = os.environ.copy()
     env.update({
@@ -155,7 +166,7 @@ def _runtime_env(args: argparse.Namespace) -> dict[str, str]:
         "HF_DATASETS_CACHE": str(payload / "cache" / "huggingface" / "datasets"),
         "HF_LEROBOT_HOME": str(payload / "cache" / "huggingface" / "lerobot"),
         "OPENPI_DATA_HOME": str(payload / "cache" / "openpi"),
-        "PYTHONPATH": os.pathsep.join((str(args.repo_root / "src"), str(args.openpi_root / "src"))),
+        "PYTHONPATH": os.pathsep.join((str(project_root / "src"), str(args.openpi_root / "src"))),
         "XLA_PYTHON_CLIENT_PREALLOCATE": "false",
         "XLA_PYTHON_CLIENT_MEM_FRACTION": "0.90",
         "SC_GIT_COMMIT": commit,
@@ -302,7 +313,7 @@ def _preflight_existing_sources(args: argparse.Namespace, tag: str) -> None:
 
 
 def _run_a2fix_safety(args: argparse.Namespace, env: dict[str, str], tag: str, log_root: Path) -> list[Path]:
-    runner = args.repo_root / "scripts" / "evaluate" / "run_self_built_mvp.py"
+    runner = _safety_project_root(args.repo_root) / "scripts" / "evaluate" / "run_self_built_mvp.py"
     python = args.openpi_root / ".venv" / "bin" / "python"
     completed: list[Path] = []
     for suite in SUITES:
@@ -783,7 +794,8 @@ def _validate_and_analyze(
     log_root: Path,
 ) -> Path:
     python = args.openpi_root / ".venv" / "bin" / "python"
-    validator = args.repo_root / "scripts" / "analyze" / "validate_episodes.py"
+    project_root = _safety_project_root(args.repo_root)
+    validator = project_root / "scripts" / "analyze" / "validate_episodes.py"
     validation_command = [str(python), str(validator), "--workspace-root", str(args.repo_root)]
     for run_id in run_ids:
         validation_command.extend(("--run-id", run_id))
@@ -797,7 +809,7 @@ def _validate_and_analyze(
             raise ContractError(f"analysis id already contains a different run set: {analysis_dir}")
         return analysis_dir
 
-    analyzer = args.repo_root / "scripts" / "analyze" / "analyze_mvp.py"
+    analyzer = project_root / "scripts" / "analyze" / "analyze_mvp.py"
     command = [
         str(python), str(analyzer), "--workspace-root", str(args.repo_root),
         "--analysis-id", analysis_id,
@@ -898,7 +910,7 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Complete analysis for the already-trained π0.5 MVP")
     parser.add_argument("--payload-root", type=Path, required=True)
     parser.add_argument("--openpi-root", type=Path, required=True)
-    parser.add_argument("--repo-root", type=Path, default=PROJECT_ROOT)
+    parser.add_argument("--repo-root", type=Path, default=WORKSPACE_ROOT)
     parser.add_argument("--source-run-date", type=lambda value: dt.date.fromisoformat(value), default=dt.date(2026, 11, 4))
     parser.add_argument("--run-date", type=lambda value: dt.date.fromisoformat(value), default=dt.date.today())
     parser.add_argument("--experiment-tag", default="optimizer_reset_completion")
