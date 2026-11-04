@@ -166,7 +166,12 @@ def _runtime_env(args: argparse.Namespace) -> dict[str, str]:
         "HF_DATASETS_CACHE": str(payload / "cache" / "huggingface" / "datasets"),
         "HF_LEROBOT_HOME": str(payload / "cache" / "huggingface" / "lerobot"),
         "OPENPI_DATA_HOME": str(payload / "cache" / "openpi"),
-        "PYTHONPATH": os.pathsep.join((str(project_root / "src"), str(args.openpi_root / "src"))),
+        "PYTHONPATH": os.pathsep.join((
+            str(args.libero_root),
+            str(project_root / "src"),
+            str(args.openpi_root / "src"),
+        )),
+        "LIBERO_CONFIG_PATH": str(args.libero_config),
         "XLA_PYTHON_CLIENT_PREALLOCATE": "false",
         "XLA_PYTHON_CLIENT_MEM_FRACTION": "0.90",
         "SC_GIT_COMMIT": commit,
@@ -199,6 +204,28 @@ def _run_logged(command: list[str], *, cwd: Path, env: dict[str, str], log_root:
         tail = log_path.read_text(encoding="utf-8", errors="replace")[-6000:]
         raise ContractError(f"command exited {result.returncode}: {' '.join(command)}\n{tail}")
     return log_path
+
+
+def _preflight_runtime(args: argparse.Namespace, env: dict[str, str]) -> None:
+    python = args.openpi_root / ".venv" / "bin" / "python"
+    check = subprocess.run(
+        [
+            str(python), "-c",
+            "from libero.libero.envs import OffScreenRenderEnv; "
+            "import imageio, mujoco; "
+            "from openpi_client import image_tools, websocket_client_policy; "
+            "print('simulator and policy client imports available')",
+        ],
+        cwd=args.repo_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    if check.returncode != 0:
+        detail = (check.stderr or check.stdout)[-5000:]
+        raise ContractError(f"simulator/runtime dependency preflight failed:\n{detail}")
 
 
 def _read_manifest_from_run(run_dir: Path) -> tuple[dict[str, Any], Path, dict[str, Any]]:
@@ -283,6 +310,8 @@ def _preflight_existing_sources(args: argparse.Namespace, tag: str) -> None:
                     state_path = Path(task["state_path"])
                     if not state_path.is_file() or sha256_file(state_path) != task["state_sha256"]:
                         raise ContractError(f"state payload missing or corrupt: {state_path}")
+                    if not Path(task["bddl_path"]).is_file():
+                        raise ContractError(f"task BDDL file missing: {task['bddl_path']}")
                 rows = _record_rows(
                     run_dir / "episodes" / "episodes.jsonl",
                     run_id=config["run_id"],
@@ -913,6 +942,16 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--payload-root", type=Path, required=True)
     parser.add_argument("--openpi-root", type=Path, required=True)
     parser.add_argument("--repo-root", type=Path, default=WORKSPACE_ROOT)
+    parser.add_argument(
+        "--libero-root",
+        type=Path,
+        default=WORKSPACE_ROOT.parent / "LIBERO-Safety",
+    )
+    parser.add_argument(
+        "--libero-config",
+        type=Path,
+        default=WORKSPACE_ROOT.parent / "libero-config",
+    )
     parser.add_argument("--source-run-date", type=lambda value: dt.date.fromisoformat(value), default=dt.date(2026, 11, 4))
     parser.add_argument("--run-date", type=lambda value: dt.date.fromisoformat(value), default=dt.date.today())
     parser.add_argument("--experiment-tag", default="optimizer_reset_completion")
@@ -933,6 +972,12 @@ def main() -> int:
     args.payload_root = args.payload_root.expanduser().resolve()
     args.openpi_root = args.openpi_root.expanduser().resolve()
     args.repo_root = args.repo_root.expanduser().resolve()
+    args.libero_root = args.libero_root.expanduser().resolve()
+    args.libero_config = args.libero_config.expanduser().resolve()
+    if not (args.libero_root / "libero").is_dir():
+        raise ContractError(f"LIBERO-Safety source package not found under {args.libero_root}")
+    if not (args.libero_config / "config.yaml").is_file():
+        raise ContractError(f"LIBERO config.yaml not found under {args.libero_config}")
     tag = _tag(args.experiment_tag)
     if args.a2fix_checkpoint_prefix != "a2fix":
         raise ContractError("the primary optimizer-moment intervention must use the fixed optimizer-reset checkpoints")
@@ -951,6 +996,7 @@ def main() -> int:
     log_root = final_root / "logs"
     final_root.mkdir(parents=True, exist_ok=True)
     _preflight_existing_sources(args, tag)
+    _preflight_runtime(args, env)
     safety_runs = _run_a2fix_safety(args, env, tag, log_root)
     state_audit = _verify_state_pairing(args, tag)
 
