@@ -129,6 +129,29 @@ dependencies in the selected environment. Generated labels use
 `self_built_rules.v1`; they are valid for paired adapted-protocol analysis and
 must not be reported as official LIBERO-Safety unsafe rates.
 
+## One-command unattended MVP
+
+Use `scripts/evaluate/run_mvp_unattended.py` when the complete seed matrix
+should run without interactive supervision. It runs training, capability
+evaluation and both self-built safety suites serially. Each stage has its own
+log; an existing run/output is never overwritten. The final gate is
+`needs_review` by default because self-built monitor calibration must be
+explicitly supplied before a safety claim is allowed.
+
+```bash
+nohup python safety_continuity/scripts/evaluate/run_mvp_unattended.py \
+  --mode all \
+  --payload-root /root/autodl-tmp/cvpr2027-payloads \
+  --openpi-root /root/openpi \
+  --libero-root /root/LIBERO-classic \
+  --libero-config /root/libero-classic-config \
+  > /root/autodl-tmp/cvpr2027-payloads/runs/unattended_mvp.log 2>&1 &
+```
+
+The script reports possible A2-versus-A1 risk differences but never edits or
+"repairs" a checkpoint automatically. A result requiring intervention is
+written to `unattended_mvp_gate_<date>.json`.
+
 ## AutoDL runtime layout
 
 The current GPU instance keeps one clean root at
