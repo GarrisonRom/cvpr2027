@@ -347,6 +347,7 @@ def _run_a2fix_safety(args: argparse.Namespace, env: dict[str, str], tag: str, l
                     summary = _json(summary_path)
                     if (
                         config.get("checkpoint_prefix") != args.a2fix_checkpoint_prefix
+                        or config.get("checkpoint_name") != f"{args.a2fix_checkpoint_prefix}_s{seed}"
                         or config.get("source_training_run_id") != training_run_id
                         or summary.get("episode_count") != len(manifest["tasks"]) * states_per_task
                     ):
@@ -366,6 +367,7 @@ def _run_a2fix_safety(args: argparse.Namespace, env: dict[str, str], tag: str, l
                 "--states-per-task", str(states_per_task),
                 "--episodes-per-task", str(states_per_task),
                 "--checkpoint-prefix", args.a2fix_checkpoint_prefix,
+                "--checkpoint-name", f"{args.a2fix_checkpoint_prefix}_s{seed}",
                 "--source-training-run-id", training_run_id,
                 "--payload-root", str(args.payload_root),
                 "--checkpoint-root", str(args.payload_root / "checkpoints"),

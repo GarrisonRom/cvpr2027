@@ -172,9 +172,13 @@ def _checkpoint_path(
     seed: int,
     weights_only_step: int,
     checkpoint_prefix: str = "",
+    checkpoint_name: str = "",
 ) -> Path:
     step = weights_only_step if condition == "A3" else 1999
-    name = f"{checkpoint_prefix}_{condition.lower()}_s{seed}" if checkpoint_prefix else f"{condition.lower()}_s{seed}"
+    name = checkpoint_name or (
+        f"{checkpoint_prefix}_{condition.lower()}_s{seed}"
+        if checkpoint_prefix else f"{condition.lower()}_s{seed}"
+    )
     path = checkpoint_root / "openpi_mvp" / "pi05_libero_mvp" / name / str(step)
     if not path.is_dir():
         raise ContractError(f"missing {condition} checkpoint: {path}")
@@ -225,6 +229,7 @@ def _full(args: argparse.Namespace) -> list[dict[str, Any]]:
                 args.seed,
                 args.weights_only_step,
                 args.checkpoint_prefix,
+                args.checkpoint_name,
             )
             run_id = make_run_id(
                 f"selfbuilt{suite.split('_')[0]}",
@@ -249,6 +254,7 @@ def _full(args: argparse.Namespace) -> list[dict[str, Any]]:
                 "source_training_run_id": args.source_training_run_id,
                 "checkpoint": str(checkpoint),
                 "checkpoint_prefix": args.checkpoint_prefix,
+                "checkpoint_name": args.checkpoint_name,
                 "state_manifest": str(manifest_path),
                 "state_manifest_sha256": manifest.manifest_sha256(),
                 "states_per_task": manifest.states_per_task,
@@ -409,6 +415,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--policy-config", default="pi05_libero")
     parser.add_argument("--weights-only-step", dest="weights_only_step", type=int, default=999)
     parser.add_argument("--checkpoint-prefix", default="")
+    parser.add_argument("--checkpoint-name", default="")
     parser.add_argument("--state-manifest", type=Path, default=None)
     parser.add_argument("--source-training-run-id", default=None)
     parser.add_argument("--overwrite-states", action="store_true")
