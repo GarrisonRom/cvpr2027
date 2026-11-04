@@ -235,6 +235,17 @@ def _configure_tracking_dataset(
 
 def _reset_adam_moments(train_lib: Any) -> None:
     original_restore = train_lib._checkpoints.restore_state
+    import jax
+
+    def zero_tree(value: Any) -> Any:
+        """Zero a parameter-shaped PyTree while preserving its container type."""
+
+        def zero_leaf(leaf: Any) -> Any:
+            if hasattr(leaf, "shape") and hasattr(leaf, "dtype"):
+                return jax.numpy.zeros_like(leaf)
+            return leaf
+
+        return jax.tree_util.tree_map(zero_leaf, value)
 
     def restore_with_moments_reset(checkpoint_manager: Any, state: Any, data_loader: Any,
                                    step: int | None = None) -> Any:
@@ -245,15 +256,22 @@ def _reset_adam_moments(train_lib: Any) -> None:
         def reset_moments(value: Any) -> Any:
             if isinstance(value, dict):
                 return {
-                    key: (reset_moments(child) if key in {"mu", "nu"} else child)
+                    key: (zero_tree(child) if key in {"mu", "nu"} else child)
                     for key, child in value.items()
                 }
+            # Optax states are NamedTuple PyTrees (for example,
+            # ScaleByAdamState(count, mu, nu)); ``type(value) is tuple`` does
+            # not match those types, so handle their named fields explicitly.
+            if hasattr(value, "_fields") and hasattr(value, "_replace"):
+                updates = {}
+                for key in value._fields:
+                    child = getattr(value, key)
+                    updates[key] = zero_tree(child) if key in {"mu", "nu"} else reset_moments(child)
+                return value._replace(**updates)
             if type(value) is list:
                 return [reset_moments(child) for child in value]
             if type(value) is tuple:
                 return tuple(reset_moments(child) for child in value)
-            if hasattr(value, "shape") and hasattr(value, "dtype"):
-                return value if value.ndim == 0 else __import__("jax").numpy.zeros_like(value)
             return value
         return dataclasses.replace(restored, opt_state=reset_moments(opt_state))
 
@@ -385,6 +403,25 @@ def main() -> int:
     )
     if args.reset_optimizer_moments:
         _reset_adam_moments(train_lib)
+        _write_json(
+            run_dir / "events" / "optimizer_moments_reset.json",
+            {
+                "schema": "optimizer_moments_reset.v1",
+                "run_id": args.run_id,
+                "condition_id": args.condition,
+                "source_checkpoint_dir": str(args.source_checkpoint_dir) if args.source_checkpoint_dir else None,
+                "reset_state_keys": ["optimizer_moments"],
+                "preserved_state_keys": [
+                    "optimizer_structure",
+                    "optimizer_step",
+                    "scheduler_and_global_step",
+                    "rng",
+                    "batch_cursor",
+                    "normalization",
+                    "gradient_accumulation",
+                ],
+            },
+        )
     from openpi.models import pi0_config as _pi0_config
     model = config_lib.get_config("pi05_libero").model
     freeze_filter = nnx.All(nnx.Not(nnx_utils.PathRegex(".*action_out_proj.*")))
