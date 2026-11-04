@@ -7,8 +7,9 @@ This folder owns experiment software and documentation for measuring safety chan
 - ../AGENTS.md is the project-wide contract for file ownership, naming, run records, analysis outputs, plots/tables, Git rules and local/cloud synchronization.
 - ../实验设置方案.md is the current research design draft. It is a proposal, not a frozen protocol or a source of experimental results.
 - docs/mvp_experiment.md is the proposed π0.5/LIBERO pilot for checking whether the measurement and attribution workflow is feasible.
+- docs/safety_measurement_protocol.md is the single source of truth for official versus self-built safety labels, state generation, monitor rules, calibration and interpretation limits.
 - docs/experiment_protocol.md defines protocol states, promotion gates and the frozen protocol manifest.
-- docs/metrics.md defines operational metrics, units, labels and aggregation.
+- docs/metrics.md defines aggregation, pairing, denominators and analysis gates; safety event definitions remain in safety_measurement_protocol.md.
 - docs/data_dictionary.md defines episode and per-step record schemas.
 - docs/cloud_setup.md records the current AutoDL payload mapping and checksum locations.
 - docs/interface_contract.md freezes the boundaries between configs, adapters,
@@ -75,16 +76,16 @@ Validate completed runs by listing each run id explicitly:
 
     python safety_continuity/scripts/analyze/validate_episodes.py --run-id 20261104_mvp_pi05_a1_s42
 
-Generate the default paired A2-versus-A1 analysis by listing all three-seed runs
-for A0, A1 and A2 (each run should contain the configured LIBERO-10 and safety
+Generate the paired fixed-A2-versus-A1 analysis by listing all three-seed runs
+for A0, A1 and fixed A2 (each run should contain the configured LIBERO-10 and safety
 benchmark episodes). A0 and A1 are required for the resume-control gate:
 
-    python safety_continuity/scripts/analyze/analyze_mvp.py --run-id 20261102_mvp_pi05_a0_s42 --run-id 20261102_mvp_pi05_a0_s43 --run-id 20261102_mvp_pi05_a0_s44 --run-id 20261102_mvp_pi05_a1_s42 --run-id 20261102_mvp_pi05_a1_s43 --run-id 20261102_mvp_pi05_a1_s44 --run-id 20261102_mvp_pi05_a2_s42 --run-id 20261102_mvp_pi05_a2_s43 --run-id 20261102_mvp_pi05_a2_s44 --analysis-id 20261102_analysis_mvp_primary_s00
+    python safety_continuity/scripts/analyze/analyze_mvp.py --run-id 20261104_mvp_pi05_a0_s42 --run-id 20261104_mvp_pi05_a0_s43 --run-id 20261104_mvp_pi05_a0_s44 --run-id 20261104_mvp_pi05_a1_s42 --run-id 20261104_mvp_pi05_a1_s43 --run-id 20261104_mvp_pi05_a1_s44 --run-id 20261104_mvp_pi05_a2fix_s42 --run-id 20261104_mvp_pi05_a2fix_s43 --run-id 20261104_mvp_pi05_a2fix_s44 --analysis-id 20261104_analysis_pi05_a2fix_s00
 
 The analysis writes a new, immutable directory under `runs/<analysis_id>/` with
 source hashes, run summaries, seed-level paired effects, and pilot bootstrap
 intervals. It also verifies the frozen and actually consumed batch sequence for
-A0/A1 and A2/A1, evaluates the configured A0/A1 safety/capability control, and
+A0/A1 and fixed-A2/A1, evaluates the configured A0/A1 safety/capability control, and
 checks the primary LIBERO-10 capability interval against its equivalence margin.
 The primary signal is supported only when the safety threshold, batch audits,
 capability gate and A0/A1 control all pass. It checks completed-run provenance

@@ -1,8 +1,11 @@
 # Experiment Protocol
 
 The current protocol is the π0.5/LIBERO pilot in
-[`mvp_experiment.md`](mvp_experiment.md). This file defines how a protocol is
-promoted from a plan to a runnable study; it does not contain changing results.
+[`mvp_experiment.md`](mvp_experiment.md). Safety event definitions and
+self-built label rules are owned exclusively by
+[`safety_measurement_protocol.md`](safety_measurement_protocol.md). This file
+defines how a protocol is promoted from a plan to a runnable study; it does not
+contain changing results.
 
 ## Protocol states
 
@@ -10,8 +13,8 @@ promoted from a plan to a runnable study; it does not contain changing results.
   fields; no effect claim is allowed.
 - **smoke:** one seed and a short horizon validate loading, checkpointing,
   restore, evaluation records and event logs; smoke output is not evidence.
-- **pilot:** the three-seed MVP matrix is run with the frozen sample schedule and
-  pre-specified pairing rules.
+- **pilot:** the three-seed MVP matrix is run with the frozen sample schedule,
+  pre-specified pairing rules and a calibrated safety monitor.
 - **confirmation:** a powered study after the pilot fixes task/scene holdouts,
   model variants, interruption positions and sample size.
 
@@ -24,8 +27,10 @@ promoted from a plan to a runnable study; it does not contain changing results.
 4. Complete the smoke workflow and verify A0/A1 sample identity.
 5. Freeze the protocol manifest and commit before the pilot starts.
 6. Analyze only explicit run ids listed by the protocol manifest.
+7. Keep official LIBERO-Safety outputs and self-built adapted-protocol outputs
+   in separate benchmark IDs and summaries.
 
 The protocol manifest is
-`manifests/experiments/mvp_protocol.yaml`. The detailed hypotheses, conditions,
-metrics, pilot scale and claim limits remain in `mvp_experiment.md` so there is a
-single experimental source of truth.
+`manifests/experiments/mvp_protocol.yaml`. Conditions and pilot scale are in
+`mvp_experiment.md`; safety definitions and metric denominators are in
+`safety_measurement_protocol.md` and `metrics.md`.

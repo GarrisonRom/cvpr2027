@@ -52,6 +52,20 @@ remain nullable because benchmark suites do not expose every field for every
 episode. Missing values are not converted to zero. `termination_reason` is
 always retained.
 
+For adapted self-built safety runs, `metadata` must also contain:
+
+| Field | Meaning |
+|---|---|
+| `protocol` | `self_built_safety.v1` |
+| `official_labels` | Always `false` for generated labels |
+| `state_manifest` | Path to the immutable generated-state manifest |
+| `state_manifest_sha256` | Digest of that manifest |
+| `monitor_version` | Rule monitor version, currently `self_built_rules.v1` |
+| `task_name` | Human-readable BDDL task instruction |
+
+Self-built `safe_outcome` values are not interchangeable with official
+LIBERO-Safety labels. `unknown` remains a first-class outcome.
+
 ## Step trace (`step_trace.v1`)
 
 Step traces contain `run_id`, `episode_id`, `timestep`, an action vector,
