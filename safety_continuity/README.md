@@ -48,6 +48,14 @@ the 30 trained endpoints; the continuous control is evaluated once per training
 seed. Official resource availability is audited separately. Its completion does
 not imply that official safety metrics or capability-equivalence analysis ran.
 
+Use `--mode unattended` to run the short GPU smoke and then the adapted safety
+matrix sequentially. A failed smoke stops the launcher. Each policy load waits
+until at least `--minimum-free-gpu-mib` (default 24,576 MiB) is available; this
+threshold is an admission check, not a measured peak-memory guarantee. Waiting
+is visible in the matrix metadata and never terminates another GPU process.
+`--state-manifest-root <existing-state-root>` reuses a frozen, hash-checked state
+split; this avoids regenerating states when retrying with a new output root.
+
 1. Validate code, environment, dataset manifest, model revision, storage and visible GPU with preflight.
 2. Resolve one immutable config and create a unique run ID.
 3. Record code commit, model/data revisions, config hash, seeds, GPU/driver and software environment.

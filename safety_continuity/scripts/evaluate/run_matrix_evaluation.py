@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -24,6 +25,30 @@ def write_json(path, payload):
     temp = path.with_suffix(path.suffix + ".tmp")
     temp.write_text(json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n", encoding="utf-8")
     temp.replace(path)
+
+
+def wait_for_gpu(minimum_free_mib, *, status, status_path):
+    if type(minimum_free_mib) is not int or minimum_free_mib <= 0:
+        raise ContractError("GPU free-memory threshold must be a positive integer")
+    while True:
+        result = subprocess.run(["nvidia-smi", "--query-gpu=memory.total,memory.free",
+                                 "--format=csv,noheader,nounits"], capture_output=True, text=True, check=True)
+        rows = result.stdout.strip().splitlines()
+        if len(rows) != 1:
+            raise ContractError("this launcher requires one explicitly visible GPU")
+        total, free = (int(value.strip()) for value in rows[0].split(","))
+        if total < minimum_free_mib:
+            raise ContractError("GPU total memory is below the requested minimum")
+        status["gpu_free_mib"] = free
+        status["gpu_minimum_free_mib"] = minimum_free_mib
+        if free >= minimum_free_mib:
+            status["status"] = "running"
+            write_json(status_path, status)
+            return
+        status["status"] = "waiting_for_gpu"
+        status["last_gpu_check_utc"] = dt.datetime.now(dt.timezone.utc).isoformat()
+        write_json(status_path, status)
+        time.sleep(30)
 
 
 def select_jobs(matrix):
@@ -76,7 +101,7 @@ def audit_official_resources(output_root):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mode", choices=("plan", "smoke", "run"), default="plan")
+    parser.add_argument("--mode", choices=("plan", "smoke", "run", "unattended"), default="plan")
     parser.add_argument("--training-matrix", type=Path, required=True)
     parser.add_argument("--calibration-report", type=Path, required=True)
     parser.add_argument("--payload-root", type=Path, required=True)
@@ -87,6 +112,8 @@ def main():
     parser.add_argument("--port", type=int, default=18000)
     parser.add_argument("--state-seed", type=int, default=20261105)
     parser.add_argument("--evaluation-seed", type=int, default=2048)
+    parser.add_argument("--minimum-free-gpu-mib", type=int, default=24576)
+    parser.add_argument("--state-manifest-root", type=Path, default=None)
     args = parser.parse_args()
     for name in ("training_matrix", "calibration_report", "payload_root", "openpi_root", "libero_root", "libero_config", "output_root"):
         setattr(args, name, getattr(args, name).resolve())
@@ -99,6 +126,33 @@ def main():
             "capability_status": "separate_evaluation_required"}
     if args.mode == "plan":
         print(json.dumps(plan, indent=2)); return 0
+    if args.mode == "unattended":
+        if args.output_root.exists():
+            raise ContractError("unattended output already exists")
+        args.output_root.mkdir(parents=True)
+        orchestration = {"schema": "mvp_unattended_evaluation.v1", "status": "smoke_pending",
+                         "phases": [], "source_matrix_sha256": sha256_file(args.training_matrix)}
+        index = args.output_root / "metadata" / "unattended.json"
+        common = ["--training-matrix", str(args.training_matrix), "--calibration-report", str(args.calibration_report),
+                  "--payload-root", str(args.payload_root), "--openpi-root", str(args.openpi_root),
+                  "--libero-root", str(args.libero_root), "--libero-config", str(args.libero_config),
+                  "--state-seed", str(args.state_seed), "--evaluation-seed", str(args.evaluation_seed),
+                  "--port", str(args.port), "--minimum-free-gpu-mib", str(args.minimum_free_gpu_mib)]
+        if args.state_manifest_root is not None:
+            common.extend(("--state-manifest-root", str(args.state_manifest_root.resolve())))
+        write_json(index, orchestration)
+        for phase in ("smoke", "run"):
+            child = args.output_root / phase
+            orchestration["status"] = f"{phase}_active"; write_json(index, orchestration)
+            with (args.output_root / f"{phase}.log").open("x", encoding="utf-8") as handle:
+                completed = subprocess.run([sys.executable, str(Path(__file__).resolve()), "--mode", phase,
+                                            "--output-root", str(child), *common], stdout=handle, stderr=subprocess.STDOUT)
+            orchestration["phases"].append({"phase": phase, "return_code": completed.returncode})
+            if completed.returncode != 0:
+                orchestration["status"] = f"{phase}_failed"; write_json(index, orchestration)
+                return completed.returncode
+        orchestration["status"] = "adapted_safety_rollouts_complete"; write_json(index, orchestration)
+        return 0
     repo = PROJECT_ROOT.parent
     commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, check=True).stdout.strip()
     dirty = subprocess.run(["git", "status", "--porcelain"], cwd=repo, capture_output=True, text=True, check=True).stdout.strip()
@@ -138,13 +192,24 @@ def main():
         # The same generated state files are used by every condition/seed/position.
         states = {}
         for suite in plan["suites"]:
-            states[suite] = generate_libero_state_manifest(suite_id=suite, level=1,
-                output_root=args.output_root/"state_manifest", generation_seed=args.state_seed,
-                states_per_task=10)
+            if args.state_manifest_root is None:
+                states[suite] = generate_libero_state_manifest(suite_id=suite, level=1,
+                    output_root=args.output_root/"state_manifest", generation_seed=args.state_seed,
+                    states_per_task=10)
+            else:
+                states[suite] = args.state_manifest_root.resolve()/"manifests"/f"{suite}_l1_self_built.json"
+            manifest = load_state_manifest(states[suite])
+            if manifest.suite_id != suite or manifest.generation_seed != args.state_seed or manifest.states_per_task != 10 or len(manifest.tasks) != 5:
+                raise ContractError("external frozen-state manifest differs from requested protocol")
+            for task in manifest.tasks:
+                if sha256_file(Path(task.state_path)) != task.state_sha256:
+                    raise ContractError("frozen-state payload hash mismatch")
+            status.setdefault("state_manifest_sha256", {})[suite] = sha256_file(states[suite])
         selected_jobs = jobs[:1] if args.mode == "smoke" else jobs
         status["status"] = "running"; write_json(status_path, status)
         for suite in plan["suites"]:
             for job in selected_jobs:
+                wait_for_gpu(args.minimum_free_gpu_mib, status=status, status_path=status_path)
                 checkpoint = Path(job["checkpoint_root"]) / str(job["checkpoint_steps"][-1])
                 out = args.output_root/"evaluations"/job["run_id"]/suite
                 command = [str(args.openpi_root/".venv"/"bin"/"python"),
