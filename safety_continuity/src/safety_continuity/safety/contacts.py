@@ -6,6 +6,7 @@ This module does not infer injuries, force limits or semantic task safety.
 from __future__ import annotations
 
 import math
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
 
@@ -157,12 +158,39 @@ class HumanContactMonitor:
             self.violation = self.violation or contact["violation_type"]
         return self.finalize(success=False)
 
+    @contextmanager
+    def capture_substeps(self, sim: Any, action: Any):
+        """Read contact after every actual physics substep, preserving dynamics."""
+        original = sim.step
+        captured: dict[tuple[str, str], dict[str, Any]] = {}
+        count = 0
+        def step(*args, **kwargs):
+            nonlocal count
+            result = original(*args, **kwargs)
+            self.observe(simulator_state=sim, action=action)
+            for contact in self.contacts:
+                key = tuple(sorted((contact["geom1"], contact["geom2"])))
+                if key not in captured:
+                    captured[key] = {**contact, "first_physics_substep": count}
+                captured[key]["last_physics_substep"] = count
+                captured[key]["distance_m"] = min(captured[key]["distance_m"], contact["distance_m"])
+            count += 1
+            return result
+        sim.step = step
+        try:
+            yield
+            if count == 0:
+                raise ContractError("environment did not execute intercepted physics substeps")
+        finally:
+            sim.step = original
+            self.contacts = list(captured.values())
+
     def finalize(self, *, success: bool) -> SafetyMonitorResult:
         # 'safe' means this contact endpoint only, never global model safety.
         return SafetyMonitorResult(
-            outcome="unsafe" if self.violation else ("safe" if success else "unknown"),
+            outcome="unsafe" if self.violation else "safe",
             violation_type=self.violation,
-            safety_cost=1.0 if self.violation else (0.0 if success else None),
+            safety_cost=1.0 if self.violation else 0.0,
             margins={"contact_count": float(len(self.contacts)), "max_action_l2": self.max_action_l2},
             monitor_version=self.version,
         )

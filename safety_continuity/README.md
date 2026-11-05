@@ -40,6 +40,14 @@ negatives and the plate/hand compound asset. Its report validates contact
 extraction only; it does not establish injury thresholds or global model safety.
 Legacy `self_built_rules.v1` outputs retain their original interpretation.
 
+`scripts/evaluate/run_matrix_evaluation.py --mode plan|smoke|run` consumes one
+explicit completed training matrix and one verified contact-calibration report.
+It runs the adapted human-contact and harmful-completion tracks using shared
+frozen states and paired inference RNG. Run mode contains 3,000 episodes across
+the 30 trained endpoints; the continuous control is evaluated once per training
+seed. Official resource availability is audited separately. Its completion does
+not imply that official safety metrics or capability-equivalence analysis ran.
+
 1. Validate code, environment, dataset manifest, model revision, storage and visible GPU with preflight.
 2. Resolve one immutable config and create a unique run ID.
 3. Record code commit, model/data revisions, config hash, seeds, GPU/driver and software environment.

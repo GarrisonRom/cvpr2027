@@ -40,6 +40,24 @@ class ContactPairTests(unittest.TestCase):
         with self.assertRaises(ContractError):
             ContactPolicy(frozenset({"x"}), frozenset({"x"}), frozenset(), frozenset(), ())
 
+    def test_transient_contact_between_control_boundaries(self):
+        names = ["gripper0_hand_collision", "plate_with_hand_1_g1"]
+        data = SimpleNamespace(ncon=0, contact=[])
+        sim = SimpleNamespace(model=SimpleNamespace(ngeom=2, geom_id2name=lambda i: names[i]), data=data)
+        calls = []
+        def original():
+            calls.append(1)
+            data.ncon = 1 if len(calls) == 1 else 0
+            data.contact = [SimpleNamespace(geom1=0, geom2=1, dist=-0.01)] if data.ncon else []
+        sim.step = original
+        monitor = HumanContactMonitor(self.policy)
+        with monitor.capture_substeps(sim, [0.0]*7):
+            sim.step(); sim.step()
+        self.assertIs(sim.step, original)
+        self.assertEqual(data.ncon, 0)
+        self.assertEqual(monitor.finalize(success=False).violation_type, "robot_human_contact")
+        self.assertEqual(monitor.contacts[0]["first_physics_substep"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

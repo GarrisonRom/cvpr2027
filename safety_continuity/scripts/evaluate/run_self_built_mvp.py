@@ -234,7 +234,7 @@ def _full(args: argparse.Namespace) -> list[dict[str, Any]]:
             run_id = make_run_id(
                 f"selfbuilt{suite.split('_')[0]}",
                 "pi05",
-                condition.lower(),
+                f"{args.run_tag}{condition.lower()}",
                 args.seed,
                 run_date=args.run_date,
             )
@@ -263,6 +263,10 @@ def _full(args: argparse.Namespace) -> list[dict[str, Any]]:
                 "num_steps_wait": args.num_steps_wait,
                 "max_steps": args.max_steps,
                 "official_labels": False,
+                "interruption_step": args.interruption_step,
+                "calibration_report": str(args.calibration_report) if args.calibration_report else None,
+                "monitor_mode": args.monitor_mode,
+                "paired_inference_rng": args.paired_inference_rng,
             }
             metadata_dir = run_dir / "metadata"
             metadata_dir.mkdir(parents=True, exist_ok=True)
@@ -289,6 +293,11 @@ def _full(args: argparse.Namespace) -> list[dict[str, Any]]:
                 f"--policy.config={args.policy_config}",
                 f"--policy.dir={checkpoint}",
             ]
+            if args.paired_inference_rng:
+                server_cmd = [str(args.openpi_root / ".venv" / "bin" / "python"),
+                              str(PROJECT_ROOT / "scripts" / "evaluate" / "serve_paired_policy.py"),
+                              "--checkpoint", str(checkpoint), "--config", args.policy_config,
+                              "--port", str(args.port)]
             with server_log.open("w", encoding="utf-8") as log_handle:
                 server = subprocess.Popen(server_cmd, env=env, stdout=log_handle, stderr=subprocess.STDOUT, text=True)
             try:
@@ -309,6 +318,10 @@ def _full(args: argparse.Namespace) -> list[dict[str, Any]]:
                     replan_steps=args.replan_steps,
                     num_steps_wait=args.num_steps_wait,
                     max_steps=args.max_steps,
+                    calibration_report=args.calibration_report,
+                    interruption_step=args.interruption_step,
+                    monitor_mode=args.monitor_mode,
+                    paired_inference_rng=args.paired_inference_rng,
                 )
                 _write_json(run_dir / "metrics" / "summary.json", summary)
                 training_run_id = args.source_training_run_id
@@ -398,7 +411,7 @@ def _parse_args() -> argparse.Namespace:
         default="all",
         help="continuous_training, full_state_resume, optimizer_moment_reset, weights_only_restart, or all",
     )
-    parser.add_argument("--seed", type=int, default=23)
+    parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--eval-seed", type=int, default=23)
     parser.add_argument("--state-seed", type=int, default=20261104)
     parser.add_argument("--level", type=int, default=1)
@@ -418,6 +431,11 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--checkpoint-name", default="")
     parser.add_argument("--state-manifest", type=Path, default=None)
     parser.add_argument("--source-training-run-id", default=None)
+    parser.add_argument("--interruption-step", type=int, default=None)
+    parser.add_argument("--calibration-report", type=Path, default=None)
+    parser.add_argument("--monitor-mode", choices=("legacy", "human_contact", "harmful_completion"), default="legacy")
+    parser.add_argument("--paired-inference-rng", action="store_true")
+    parser.add_argument("--run-tag", default="")
     parser.add_argument("--overwrite-states", action="store_true")
     parser.add_argument("--save-videos", action="store_true")
     parser.add_argument("--run-date", type=lambda value: dt.date.fromisoformat(value), default=dt.date.today())
