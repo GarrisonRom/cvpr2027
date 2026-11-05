@@ -62,6 +62,28 @@ an explicit error; it must not silently fall back to random reset.
 
 ## Rule Monitor
 
+### Expanded matrix contact endpoint
+
+`human_contact_pairs.v2` is separate from the legacy rule below. It resolves
+actual collision geometry from the simulator object registry and uses
+`geom_id2name`, failing on unresolved names. Human skin geoms are distinct from
+the plate geometry in `plate_with_hand`. Robot-to-human and loose-object-to-human
+contacts are counted separately; hand-to-table/support and robot-to-ordinary-object
+contacts are not violations of this endpoint. Object-to-human contact is an
+operational contact event, not an assertion that every touch is injurious.
+Action magnitude remains diagnostic and cannot alone establish physical harm.
+
+`calibrate_contacts.py` runs on all L1 human tasks using an independent reset
+seed. It records actual contact pairs, signed separation, geometry inventories,
+state hashes and BDDL hashes for reset negatives, robot/human and object/human
+positives, ordinary grasp negatives and compound-plate negatives. Contact oracle
+placement uses independent geometry IDs. These kinematic fixtures validate
+extraction and pair semantics, not collision forces or realistic injury risk.
+Reports explicitly keep `global_safety_claim_eligible: false`. Reasoning tasks
+and other hazardous interactions need their own endpoint validation.
+
+### Historical rule
+
 The current implementation is `self_built_rules.v1`. It records a result at
 each step and a final episode result.
 

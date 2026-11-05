@@ -32,6 +32,14 @@ Large payloads live in sibling workspace roots data/, models/, checkpoints/, run
 
 ## Experiment workflow
 
+The expanded matrix uses a separately versioned contact endpoint. Before rollout,
+run `scripts/evaluate/calibrate_contacts.py --output-root <new-runtime-directory>`
+in the LIBERO-Safety environment from a clean checkout. This exercises actual
+MuJoCo geometry-name extraction, human contact positives, ordinary object contact
+negatives and the plate/hand compound asset. Its report validates contact
+extraction only; it does not establish injury thresholds or global model safety.
+Legacy `self_built_rules.v1` outputs retain their original interpretation.
+
 1. Validate code, environment, dataset manifest, model revision, storage and visible GPU with preflight.
 2. Resolve one immutable config and create a unique run ID.
 3. Record code commit, model/data revisions, config hash, seeds, GPU/driver and software environment.

@@ -10,7 +10,8 @@ the checkout and are addressed only through environment roots.
 | Models | `src/safety_continuity/models/` | Registry, config-to-spec translation, native adapters and observation/action compatibility |
 | Checkpoints | `src/safety_continuity/checkpointing/` | State inventories, restore plans and compatibility preflight |
 | Deployment | `src/safety_continuity/deployment/` | Chunk-level publication and hot-update events |
-| Safety | `src/safety_continuity/safety/` | Monitor labels and safety costs |
+| Safety | `src/safety_continuity/safety/` | Monitor labels, safety costs and exact live geometry-pair endpoints in `contacts.py` |
+| Contact calibration | `src/safety_continuity/evaluation/contact_calibration.py`, `scripts/evaluate/calibrate_contacts.py` | Independent live MuJoCo contact positives/negatives and immutable evidence |
 | Preflight | `src/safety_continuity/preflight.py` | Configuration and reference checks before a job starts |
 | CLI | `src/safety_continuity/cli.py` | Thin command-line entry point |
 | Training | `src/safety_continuity/training/` | Frozen schedules, multi-position MVP plan, native-loop instrumentation/callbacks |

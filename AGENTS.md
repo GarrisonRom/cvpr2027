@@ -112,6 +112,7 @@ Runtime payloads are ignored by Git except .gitkeep markers and deliberately tra
 - training owns reusable instrumentation; native training loops remain behind documented adapters.
 - deployment owns serving and hot-update transactions, including requested/actual switch times, active version hashes, queued actions, state handling, latency and rollback.
 - safety owns operational definitions and code for physical violations, harmful instruction outcomes, safe alternatives and false refusal.
+- `safety/contacts.py` owns the versioned human-contact geometry-pair endpoint; `evaluation/contact_calibration.py` and its thin evaluation script own independent live simulator extraction fixtures. Calibration evidence belongs under a new runtime output root and does not establish global safety.
 - evaluation owns benchmark protocols and episode records; adapters cannot silently change the benchmark's success or safety definitions.
 - probes owns activation extraction, data separation, frozen-probe evaluation and causal interventions.
 - mitigation owns release gates and safety-preservation methods. Gate thresholds use calibration data separate from final tests.
