@@ -31,6 +31,7 @@ from safety_continuity.data.schemas import (
     UpdateSampleRef,
 )
 from safety_continuity.training.contracts import BatchManifestRef
+from safety_continuity.training.mvp_plan import MvpTrainingSlice
 
 
 LIBERO10_TASKS = (
@@ -278,6 +279,31 @@ def _reset_adam_moments(train_lib: Any) -> None:
     train_lib._checkpoints.restore_state = restore_with_moments_reset
 
 
+def _checkpoint_loop_steps(total_steps: int, optimizer_checkpoint_steps: tuple[int, ...]) -> tuple[int, ...]:
+    """Map optimizer update counts to OpenPI loop indices and retain the final state."""
+
+    if type(total_steps) is not int or total_steps <= 0:
+        raise ContractError("total_steps must be a positive integer")
+    if len(optimizer_checkpoint_steps) != len(set(optimizer_checkpoint_steps)):
+        raise ContractError("checkpoint-at-steps must not contain duplicates")
+    if any(type(step) is not int or not 0 < step <= total_steps for step in optimizer_checkpoint_steps):
+        raise ContractError("checkpoint-at-steps must satisfy 0 < step <= total_steps")
+    return tuple(sorted({*(step - 1 for step in optimizer_checkpoint_steps), total_steps - 1}))
+
+
+def _install_checkpoint_filter(train_lib: Any, loop_steps: tuple[int, ...]) -> None:
+    """Keep selected prefix states while OpenPI's loop calls save_state per step."""
+
+    original_save_state = train_lib._checkpoints.save_state
+    selected = frozenset(loop_steps)
+
+    def save_selected(checkpoint_manager: Any, state: Any, data_loader: Any, step: Any) -> None:
+        if int(step) in selected:
+            original_save_state(checkpoint_manager, state, data_loader, int(step))
+
+    train_lib._checkpoints.save_state = save_selected
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run one controlled OpenPI MVP branch")
     parser.add_argument("--openpi-root", type=Path, required=True)
@@ -286,9 +312,28 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--condition", choices=["PRE", "A0", "A1", "A2", "A3"])
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--total-steps", type=int, required=True)
+    parser.add_argument(
+        "--experiment-total-steps",
+        type=int,
+        default=None,
+        help="full schedule horizon; defaults to --total-steps for legacy runs",
+    )
     parser.add_argument("--schedule-start", type=int, default=0)
     parser.add_argument("--schedule-count", type=int, required=True)
     parser.add_argument("--optimizer-step-start", type=int, default=0)
+    parser.add_argument(
+        "--interruption-step",
+        type=int,
+        default=None,
+        help="validated multi-position plan boundary; omitted for legacy runs",
+    )
+    parser.add_argument(
+        "--checkpoint-at-steps",
+        type=int,
+        nargs="*",
+        default=[],
+        help="optimizer update counts whose prefix checkpoints must be retained",
+    )
     parser.add_argument("--schedule-path", type=Path, required=True)
     parser.add_argument("--selected-episodes", type=int, nargs="+", required=True)
     parser.add_argument("--source-checkpoint-dir", type=Path, default=None)
@@ -298,20 +343,85 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> int:
-    args = _parse_args()
+def _validate_runner_args(args: argparse.Namespace) -> MvpTrainingSlice | None:
+    if type(args.total_steps) is not int or args.total_steps <= 0:
+        raise ContractError("total_steps must be a positive integer")
+    experiment_total_steps = (
+        args.total_steps
+        if args.experiment_total_steps is None
+        else args.experiment_total_steps
+    )
+    if type(experiment_total_steps) is not int or experiment_total_steps <= 0:
+        raise ContractError("experiment_total_steps must be a positive integer")
     if args.schedule_start < 0 or args.schedule_count <= 0:
         raise ContractError("invalid schedule slice")
-    if args.schedule_start + args.schedule_count > args.total_steps and args.condition != "A3":
-        raise ContractError("schedule slice must cover the requested optimizer horizon")
+    if args.schedule_start + args.schedule_count > experiment_total_steps:
+        raise ContractError("schedule slice exceeds the experiment horizon")
+    if len(args.checkpoint_at_steps) != len(set(args.checkpoint_at_steps)):
+        raise ContractError("checkpoint-at-steps must not contain duplicates")
+    if any(type(step) is not int or not 0 < step <= experiment_total_steps for step in args.checkpoint_at_steps):
+        raise ContractError("checkpoint-at-steps must be within the experiment horizon")
+    if args.checkpoint_at_steps and args.condition != "A0":
+        raise ContractError("multi-position prefix checkpoints can only be requested on continuous training")
+    if any(step > args.total_steps for step in args.checkpoint_at_steps):
+        raise ContractError("checkpoint-at-steps must be within this trainer invocation")
+    if args.interruption_step is None:
+        if args.condition == "A0" and args.experiment_total_steps is not None:
+            planned_slice = MvpTrainingSlice(
+                condition_id="A0",
+                training_seed=args.seed,
+                interruption_step=None,
+                total_steps=experiment_total_steps,
+                trainer_total_steps=args.total_steps,
+                schedule_start=args.schedule_start,
+                schedule_count=args.schedule_count,
+                optimizer_step_start=args.optimizer_step_start,
+            )
+            planned_slice.validate()
+            return planned_slice
+        if args.schedule_start + args.schedule_count > args.total_steps and args.condition != "A3":
+            raise ContractError("legacy schedule slice must fit within total_steps")
+        return None
+    if args.condition is None:
+        raise ContractError("interruption_step requires a condition")
+    planned_slice = MvpTrainingSlice(
+        condition_id=args.condition,
+        training_seed=args.seed,
+        interruption_step=args.interruption_step,
+        total_steps=experiment_total_steps,
+        trainer_total_steps=args.total_steps,
+        schedule_start=args.schedule_start,
+        schedule_count=args.schedule_count,
+        optimizer_step_start=args.optimizer_step_start,
+    )
+    planned_slice.validate()
+    return planned_slice
+
+
+def main() -> int:
+    args = _parse_args()
+    _validate_runner_args(args)
+    experiment_total_steps = (
+        args.total_steps
+        if args.experiment_total_steps is None
+        else args.experiment_total_steps
+    )
+    retained_checkpoint_steps = (
+        _checkpoint_loop_steps(args.total_steps, tuple(args.checkpoint_at_steps))
+        if args.checkpoint_at_steps else ()
+    )
     roots = RuntimeRoots.from_env(args.openpi_root.parent)
     schedule_path = args.schedule_path.expanduser().resolve()
     if not schedule_path.is_file():
+        if args.interruption_step is not None:
+            raise ContractError(
+                "multi-position plan requires its existing frozen schedule; implicit schedule creation is disabled"
+            )
         selected = tuple(args.selected_episodes)
         _write_schedule(
             repo_id="physical-intelligence/libero",
             schedule_path=schedule_path,
-            total_samples=args.total_steps,
+            total_samples=experiment_total_steps,
             selected_episode_indices=selected,
             seed=args.seed,
         )
@@ -323,10 +433,12 @@ def main() -> int:
                 from safety_continuity.data.schemas import update_sample_from_mapping
                 schedule_rows.append(update_sample_from_mapping(_json.loads(line)))
     schedule_samples = tuple(schedule_rows)
-    if len(schedule_samples) < args.total_steps:
-        raise ContractError("schedule file is shorter than the training horizon")
+    if len(schedule_samples) < experiment_total_steps:
+        raise ContractError("schedule file is shorter than the full experiment horizon")
 
     run_dir = roots.run_root / args.run_id
+    if run_dir.exists():
+        raise ContractError(f"refusing to overwrite existing training run: {run_dir}")
     for name in ("metadata", "events", "episodes", "metrics", "logs"):
         (run_dir / name).mkdir(parents=True, exist_ok=True)
     resolved = {
@@ -335,8 +447,12 @@ def main() -> int:
         "condition": args.condition,
         "seed": args.seed,
         "total_steps": args.total_steps,
+        "experiment_total_steps": experiment_total_steps,
         "schedule_start": args.schedule_start,
         "schedule_count": args.schedule_count,
+        "interruption_step": args.interruption_step,
+        "checkpoint_at_steps": list(args.checkpoint_at_steps),
+        "checkpoint_loop_steps": list(retained_checkpoint_steps),
         "schedule_path": str(schedule_path),
         "schedule_sha256": sha256_file(schedule_path),
         "selected_episodes": list(args.selected_episodes),
@@ -365,7 +481,12 @@ def main() -> int:
         framework_versions={"openpi": "pinned_external_checkout", "runner": "openpi_mvp.v1"},
         simulator_version="not_run_in_training",
         started_at_utc=now,
-        extra={"condition": args.condition, "schedule_start": args.schedule_start},
+        extra={
+            "condition": args.condition,
+            "schedule_start": args.schedule_start,
+            "interruption_step": args.interruption_step,
+            "experiment_total_steps": experiment_total_steps,
+        },
     )
     _write_json(run_dir / "metadata" / "provenance.json", provenance.to_dict())
     ref = BatchManifestRef(
@@ -384,11 +505,13 @@ def main() -> int:
     _write_json(run_dir / "metadata" / "batch_manifest.json", ref.to_dict())
     consumption_path = run_dir / "events" / "batch_consumption.jsonl"
     if consumption_path.exists():
-        consumption_path.unlink()
+        raise ContractError(f"refusing to overwrite existing batch trace: {consumption_path}")
 
     nnx, nnx_utils, pi0_config, config_lib, data_loader, weight_loaders, AssetsConfig = \
         _load_openpi_modules(args.openpi_root)
     train_lib = _load_train_script(args.openpi_root)
+    if retained_checkpoint_steps:
+        _install_checkpoint_filter(train_lib, retained_checkpoint_steps)
     _configure_tracking_dataset(
         data_loader,
         selected_episode_indices=tuple(args.selected_episodes),
@@ -447,8 +570,8 @@ def main() -> int:
         num_workers=0,
         num_train_steps=args.total_steps,
         log_interval=10,
-        save_interval=args.total_steps,
-        keep_period=None,
+        save_interval=1 if args.checkpoint_at_steps else args.total_steps,
+        keep_period=1 if args.checkpoint_at_steps else None,
         overwrite=not args.resume,
         resume=args.resume,
         wandb_enabled=False,
@@ -456,6 +579,15 @@ def main() -> int:
         fsdp_devices=1,
     )
     train_lib.main(config)
+    checkpoint_run_root = checkpoint_base / config.name / config.exp_name
+    expected_checkpoints = retained_checkpoint_steps or (args.total_steps - 1,)
+    missing_checkpoints = [
+        checkpoint_run_root / str(step)
+        for step in expected_checkpoints
+        if not (checkpoint_run_root / str(step)).is_dir()
+    ]
+    if missing_checkpoints:
+        raise ContractError(f"OpenPI did not retain required checkpoints: {missing_checkpoints}")
     ended = datetime.now(timezone.utc).isoformat()
     payload = json.loads((run_dir / "metadata" / "provenance.json").read_text(encoding="utf-8"))
     payload["ended_at_utc"] = ended

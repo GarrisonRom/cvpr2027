@@ -74,6 +74,18 @@ training or evaluation:
 
     python safety_continuity/scripts/preflight/validate_mvp_plan.py --workspace-root .
 
+Run the CPU-only training/evaluation contract smoke:
+
+    python safety_continuity/scripts/train/smoke_mvp_plan.py --workspace-root .
+
+Print the full training-stage plan without touching checkpoints:
+
+    python safety_continuity/scripts/train/run_mvp_matrix.py --mode plan --payload-root /root/autodl-tmp/cvpr2027_RoBo/cvpr2027-payloads --openpi-root /root/autodl-tmp/cvpr2027_RoBo/openpi --repo-root /root/autodl-tmp/cvpr2027_RoBo/cvpr2027
+
+Launch all training stages on the GPU instance only after reviewing the plan:
+
+    python safety_continuity/scripts/train/run_mvp_matrix.py --mode train --payload-root /root/autodl-tmp/cvpr2027_RoBo/cvpr2027-payloads --openpi-root /root/autodl-tmp/cvpr2027_RoBo/openpi --repo-root /root/autodl-tmp/cvpr2027_RoBo/cvpr2027
+
 Validate completed runs by listing each run id explicitly:
 
     python safety_continuity/scripts/analyze/validate_episodes.py --run-id 20261104_mvp_pi05_a1_s42

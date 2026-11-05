@@ -49,6 +49,7 @@ def main() -> int:
                 "training_seed": item.training_seed,
                 "interruption_step": item.interruption_step,
                 "total_steps": item.total_steps,
+                "trainer_total_steps": item.trainer_total_steps,
                 "schedule_start": item.schedule_start,
                 "schedule_count": item.schedule_count,
                 "optimizer_step_start": item.optimizer_step_start,

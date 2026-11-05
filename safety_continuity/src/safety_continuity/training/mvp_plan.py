@@ -67,6 +67,7 @@ class MvpTrainingSlice:
     training_seed: int
     interruption_step: int | None
     total_steps: int
+    trainer_total_steps: int
     schedule_start: int
     schedule_count: int
     optimizer_step_start: int
@@ -80,6 +81,7 @@ class MvpTrainingSlice:
                 f"got {self.training_seed!r}"
             )
         _positive_int(self.total_steps, "total_steps")
+        _positive_int(self.trainer_total_steps, "trainer_total_steps")
         if type(self.schedule_start) is not int or self.schedule_start < 0:
             raise ContractError("schedule_start must be a non-negative integer")
         _positive_int(self.schedule_count, "schedule_count")
@@ -92,21 +94,45 @@ class MvpTrainingSlice:
         if self.condition_id == "A0":
             if self.interruption_step is not None or self.schedule_start != 0:
                 raise ContractError("continuous training must consume the full schedule from zero")
-            if self.schedule_count != self.total_steps or self.optimizer_step_start != 0:
+            if (
+                self.schedule_count != self.total_steps
+                or self.trainer_total_steps != self.total_steps
+                or self.optimizer_step_start != 0
+            ):
                 raise ContractError("continuous training slice must cover the full horizon")
         elif self.condition_id == "PRE":
-            if self.interruption_step is None or self.schedule_count != self.interruption_step:
+            if (
+                self.interruption_step is None
+                or self.schedule_count != self.interruption_step
+                or self.trainer_total_steps != self.interruption_step
+            ):
                 raise ContractError("interruption checkpoint slice must end at its interruption step")
             if self.schedule_start != 0 or self.optimizer_step_start != 0:
                 raise ContractError("interruption checkpoint must start at optimizer step zero")
-        else:
+        elif self.condition_id in {"A1", "A2"}:
             if self.interruption_step is None:
                 raise ContractError(f"{self.condition_id} requires an interruption step")
             point = InterruptionPoint(self.interruption_step, self.total_steps)
-            if self.schedule_start != point.step or self.schedule_count != point.suffix_steps:
+            if (
+                self.schedule_start != point.step
+                or self.schedule_count != point.suffix_steps
+                or self.trainer_total_steps != self.total_steps
+            ):
                 raise ContractError(f"{self.condition_id} must consume the post-interruption suffix")
             if self.optimizer_step_start != point.step:
                 raise ContractError(f"{self.condition_id} must preserve the optimizer step at resume")
+        else:
+            if self.interruption_step is None:
+                raise ContractError("A3 requires an interruption step")
+            point = InterruptionPoint(self.interruption_step, self.total_steps)
+            if (
+                self.schedule_start != point.step
+                or self.schedule_count != point.suffix_steps
+                or self.trainer_total_steps != point.suffix_steps
+            ):
+                raise ContractError("A3 must train for the suffix length on the frozen post-interruption schedule")
+            if self.optimizer_step_start != 0:
+                raise ContractError("A3 starts with a fresh optimizer at step zero")
 
 
 @dataclass(frozen=True)
@@ -234,12 +260,23 @@ class MvpExperimentPlan:
         for seed in self.training_seeds:
             for condition_id in condition_ids:
                 if condition_id == "A0":
-                    item = MvpTrainingSlice(condition_id, seed, None, self.total_steps, 0, self.total_steps, 0)
+                    item = MvpTrainingSlice(
+                        condition_id, seed, None, self.total_steps, self.total_steps,
+                        0, self.total_steps, 0,
+                    )
                 elif condition_id == "PRE":
-                    item = MvpTrainingSlice(condition_id, seed, point.step, self.total_steps, 0, point.prefix_steps, 0)
+                    item = MvpTrainingSlice(
+                        condition_id, seed, point.step, self.total_steps, point.prefix_steps,
+                        0, point.prefix_steps, 0,
+                    )
+                elif condition_id == "A3":
+                    item = MvpTrainingSlice(
+                        condition_id, seed, point.step, self.total_steps, point.suffix_steps,
+                        point.step, point.suffix_steps, 0,
+                    )
                 else:
                     item = MvpTrainingSlice(
-                        condition_id, seed, point.step, self.total_steps,
+                        condition_id, seed, point.step, self.total_steps, self.total_steps,
                         point.step, point.suffix_steps, point.step,
                     )
                 item.validate()
@@ -276,7 +313,8 @@ class MvpExperimentPlan:
         resume_conditions = ("A1", "A2", "A3") if include_weights_only else ("A1", "A2")
         for seed in self.training_seeds:
             continuous = MvpTrainingSlice(
-                "A0", seed, None, self.total_steps, 0, self.total_steps, 0,
+                "A0", seed, None, self.total_steps, self.total_steps,
+                0, self.total_steps, 0,
             )
             continuous.validate()
             slices.append(continuous)

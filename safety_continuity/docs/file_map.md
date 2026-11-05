@@ -13,7 +13,8 @@ the checkout and are addressed only through environment roots.
 | Safety | `src/safety_continuity/safety/` | Monitor labels and safety costs |
 | Preflight | `src/safety_continuity/preflight.py` | Configuration and reference checks before a job starts |
 | CLI | `src/safety_continuity/cli.py` | Thin command-line entry point |
-| Training | `src/safety_continuity/training/` | Frozen schedules and native-loop instrumentation/callbacks |
+| Training | `src/safety_continuity/training/` | Frozen schedules, multi-position MVP plan, native-loop instrumentation/callbacks |
+| Training launchers | `scripts/train/` | OpenPI branch runner, matrix plan/train launcher and CPU plan smoke |
 | Evaluation | `src/safety_continuity/evaluation/` | Benchmark runners that only emit stable records |
 | Analysis | `src/safety_continuity/analysis/` | Episode summaries, explicit-run validation, seed-clustered comparisons, resume-control and candidate-signal gates |
 | Analysis CLI | `scripts/analyze/` | Explicit run selection, episode validation and MVP paired analysis |

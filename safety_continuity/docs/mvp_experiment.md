@@ -4,13 +4,17 @@ This document is the execution plan for the interruption pilot. Safety event
 definitions are maintained separately in
 [`safety_measurement_protocol.md`](safety_measurement_protocol.md).
 
-The pilot has two tracks:
+The pilot separates three outcome tracks:
 
-- **official capability:** standard LIBERO-10;
+- **capability:** standard LIBERO-10 task success;
+- **official safety:** official LIBERO-Safety labels/initial states when supplied by the benchmark release;
 - **self-built safety:** LIBERO-Safety BDDL/tasks with generated L1 states and
   `self_built_rules.v1` labels.
 
-Self-built results are adapted-protocol evidence. They are not official
+Official and self-built safety outputs are reported separately. If official
+labels or initial states are unavailable for a task, that official result is
+recorded as unavailable; generated states are reported only in the self-built
+track. Self-built results are adapted-protocol evidence, not official
 LIBERO-Safety leaderboard metrics.
 
 ## Research Question
@@ -36,7 +40,7 @@ equivalence gate. The experiment is not designed to maximize task success.
 | Training seeds | `42`, `43`, `44` |
 | Capability suite | official LIBERO-10, 10 tasks |
 | Safety tracks | official LIBERO-Safety plus self-built `human_safety` and `reasoning_safety`, L1 |
-| Episodes | 10 per task, condition and training seed on both safety tracks |
+| Episodes | 10 per task, condition and training seed for each available track |
 | Pairing | same task, state seed, instruction and evaluator seed |
 | Primary optimizer condition | Optimizer-moment reset using the fixed implementation; runs before the fix are excluded |
 
@@ -215,3 +219,31 @@ The output distinguishes comparison rows from unique training invocations. A
 valid plan reports one continuous run per seed with all prefix checkpoint
 positions, then position-specific resume branches. It also requires both
 official and self-built safety tracks and a monitor calibration requirement.
+
+The matrix launcher separates read-only plan inspection from execution:
+
+```bash
+python safety_continuity/scripts/train/run_mvp_matrix.py \\
+  --mode plan \\
+  --payload-root /root/autodl-tmp/cvpr2027_RoBo/cvpr2027-payloads \\
+  --openpi-root /root/autodl-tmp/cvpr2027_RoBo/openpi \\
+  --repo-root /root/autodl-tmp/cvpr2027_RoBo/cvpr2027
+```
+
+Training mode uses the same arguments with `--mode train`. It runs one
+continuous baseline per seed, retains optimizer-update prefixes at 500, 1000
+and 1500, then runs the three position-specific branches. Resume checkpoints
+are staged under new branch names; existing runs/checkpoints cause an error.
+The matrix manifest records each completed training stage. CPU smoke and plan
+inspection do not load the model or start training.
+
+Run the CPU-only matrix and schema smoke after plan preflight:
+
+```bash
+python safety_continuity/scripts/train/smoke_mvp_plan.py \\
+  --workspace-root .
+```
+
+This checks frozen schedule lengths, prefix/suffix reconstruction, branch
+slice identities and position-aware episode pairing. It does not load OpenPI
+or start a GPU training job.
