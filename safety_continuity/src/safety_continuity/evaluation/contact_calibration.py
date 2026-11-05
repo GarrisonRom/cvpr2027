@@ -43,7 +43,7 @@ def _case(env: Any, policy: Any, name: str, expected: str | None, required_pairs
     }
 
 
-def _place_until_contact(env: Any, *, obj: Any, source_geom: str, targets: set[str], forbidden: set[str]) -> list[str] | None:
+def _place_until_contact(env: Any, *, obj: Any, source_geom: str, targets: set[str], forbidden: set[str], forbidden_pairs: set[frozenset[int]] | None = None) -> list[str] | None:
     """Search fixed offsets; oracle uses explicit simulator IDs, never monitor labels."""
     import numpy as np
     sim = env.sim
@@ -71,6 +71,8 @@ def _place_until_contact(env: Any, *, obj: Any, source_geom: str, targets: set[s
                 c = data.contact[index]
                 pair = {int(c.geom1), int(c.geom2)}
                 if pair & forbidden_ids and pair & target_ids:
+                    rejected = True
+                if forbidden_pairs and frozenset(pair) in forbidden_pairs:
                     rejected = True
                 if source_id in pair and pair & target_ids and float(c.dist) <= 0:
                     hit = [model.geom_id2name(int(c.geom1)), model.geom_id2name(int(c.geom2))]
@@ -125,14 +127,18 @@ def calibrate_contacts(*, output_root: Path, repo_root: Path, seed: int = 202611
                 raise ContractError(f"no live object-human positive contact for {task.name}")
             cases.append(_case(env, policy, "object_human_positive", "object_human_contact", [pair], state_dir))
             restore()
-            pair = _place_until_contact(env, obj=movable, source_geom=object_geom, targets=gripper, forbidden=set(policy.human))
+            forbidden_pairs = {
+                frozenset((int(env.sim.model.geom_name2id(h)), int(env.sim.model.geom_name2id(other))))
+                for h in policy.human for other in policy.robot | policy.objects
+            }
+            pair = _place_until_contact(env, obj=movable, source_geom=object_geom, targets=gripper, forbidden=set(policy.human), forbidden_pairs=forbidden_pairs)
             if pair is None:
                 raise ContractError(f"no live robot-object negative contact for {task.name}")
             cases.append(_case(env, policy, "robot_object_negative", None, [pair], state_dir))
             restore()
             if policy.assembly_support:
                 support_geom = sorted(policy.assembly_support)[0]
-                pair = _place_until_contact(env, obj=human_obj, source_geom=support_geom, targets=gripper, forbidden=set(policy.human))
+                pair = _place_until_contact(env, obj=human_obj, source_geom=support_geom, targets=gripper, forbidden=set(policy.human), forbidden_pairs=forbidden_pairs)
                 if pair is None:
                     raise ContractError(f"no plate-only negative contact for {task.name}")
                 cases.append(_case(env, policy, "robot_plate_negative", None, [pair], state_dir))
