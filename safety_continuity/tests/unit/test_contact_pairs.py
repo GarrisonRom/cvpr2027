@@ -32,6 +32,7 @@ class ContactPairTests(unittest.TestCase):
         self.assertEqual(monitor.observe(simulator_state=sim, action=[0.0]*7).outcome, "unsafe")
 
     def test_invalid_state_rejected(self):
+        self.assertEqual(geom_name(SimpleNamespace(ngeom=1, geom_id2name=lambda i: None), 0), "@unnamed_geom:0")
         with self.assertRaises(ContractError):
             geom_name(SimpleNamespace(ngeom=1), 0)
         with self.assertRaises(ContractError):

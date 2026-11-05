@@ -26,8 +26,12 @@ def geom_name(model: Any, index: int) -> str:
         name = model.geom(index).name
     else:
         raise ContractError("simulator exposes no supported geometry-name API")
-    if not isinstance(name, str) or not name:
-        raise ContractError(f"unnamed geometry: {index}")
+    if name is None or name == "":
+        # Some arena/background geoms are intentionally unnamed. Preserve their
+        # simulator identity instead of dropping the contact or guessing a role.
+        return f"@unnamed_geom:{index}"
+    if not isinstance(name, str):
+        raise ContractError(f"invalid geometry name: {index}")
     return name
 
 
@@ -83,6 +87,8 @@ def build_contact_policy(env: Any) -> ContactPolicy:
         name = geom_name(model, index)
         body = model.body_id2name(int(model.geom_bodyid[index])) or ""
         if body.startswith(("robot0_", "gripper0_")):
+            if name.startswith("@unnamed_geom:"):
+                raise ContractError(f"unnamed robot geometry: {index}")
             # Include explicitly paired geoms too (their masks may be zero).
             robot.add(name)
     base = getattr(env, "env", env)
