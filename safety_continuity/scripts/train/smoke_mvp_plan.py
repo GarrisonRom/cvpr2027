@@ -102,6 +102,64 @@ def main() -> int:
             self_built_config=self_built_config,
         ),
     )
+    mismatched_model_config = {
+        **evaluation_config,
+        "mvp": {**evaluation_config["mvp"], "model_id": "different_model"},
+    }
+    must_reject(
+        "training and evaluation use the same frozen model",
+        lambda: MvpExperimentPlan.from_mapping(
+            training_config=training_config,
+            interruption_config=interruption_config,
+            evaluation_config=mismatched_model_config,
+            self_built_config=self_built_config,
+        ),
+    )
+    duplicate_benchmark_config = {
+        **evaluation_config,
+        "self_built_safety": {
+            **evaluation_config["self_built_safety"],
+            "benchmark_id": evaluation_config["official_safety"]["benchmark_id"],
+        },
+    }
+    must_reject(
+        "official and self-built benchmark IDs stay separate",
+        lambda: MvpExperimentPlan.from_mapping(
+            training_config=training_config,
+            interruption_config=interruption_config,
+            evaluation_config=duplicate_benchmark_config,
+            self_built_config=self_built_config,
+        ),
+    )
+    uncalibrated_monitor_config = {
+        **self_built_config,
+        "calibration": {
+            **self_built_config["calibration"],
+            "physical_contact_calibration_required": False,
+        },
+    }
+    must_reject(
+        "physical contact calibration cannot be disabled",
+        lambda: MvpExperimentPlan.from_mapping(
+            training_config=training_config,
+            interruption_config=interruption_config,
+            evaluation_config=evaluation_config,
+            self_built_config=uncalibrated_monitor_config,
+        ),
+    )
+    incorrectly_official_self_built = {
+        **self_built_config,
+        "official_labels": True,
+    }
+    must_reject(
+        "self-built labels cannot claim official provenance",
+        lambda: MvpExperimentPlan.from_mapping(
+            training_config=training_config,
+            interruption_config=interruption_config,
+            evaluation_config=evaluation_config,
+            self_built_config=incorrectly_official_self_built,
+        ),
+    )
 
     split_root = workspace_root / "data" / "splits"
     manifest_by_seed = {}
@@ -330,7 +388,7 @@ def main() -> int:
             expected_loop_steps
         ),
         "synthetic_episode_count": len(smoke_records),
-        "rejected_invalid_case_count": 5,
+        "rejected_invalid_case_count": 9,
         "official_and_self_built_tracks_separate": True,
         "checkpoint_stage_smoke": "ok",
         "official_safety_enabled": plan.official_safety_enabled,

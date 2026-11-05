@@ -172,6 +172,8 @@ class MvpExperimentPlan:
             raise ContractError("self_built_safety_enabled must be boolean")
         if not self.official_safety_enabled or not self.self_built_safety_enabled:
             raise ContractError("MVP requires both official and self-built safety tracks")
+        if type(self.calibration_required) is not bool:
+            raise ContractError("calibration_required must be boolean")
         if self.calibration_required is not True:
             raise ContractError("MVP requires monitor calibration before safety claims")
 
@@ -229,24 +231,48 @@ class MvpExperimentPlan:
             raise ContractError("self-built training_seeds must equal [42, 43, 44]")
         if evaluation_config.get("report", {}).get("use_official_safety_labels") is not True:
             raise ContractError("official safety track must use official safety labels")
+        official_benchmark_id = official.get("benchmark_id")
+        self_built_benchmark_id = self_built.get("benchmark_id")
+        if (
+            not isinstance(official_benchmark_id, str)
+            or not official_benchmark_id.strip()
+            or not isinstance(self_built_benchmark_id, str)
+            or not self_built_benchmark_id.strip()
+        ):
+            raise ContractError("official and self-built safety tracks need benchmark ids")
+        if official_benchmark_id == self_built_benchmark_id:
+            raise ContractError("official and self-built safety tracks must use distinct benchmark ids")
+        if self_built_config.get("official_labels") is not False:
+            raise ContractError("self-built safety track must set official_labels=false")
         if self_built_config.get("outputs", {}).get("official_safety_metric") != "prohibited":
             raise ContractError("self-built track must prohibit official safety metrics")
+        calibration_config = self_built_config.get("calibration", {})
+        if calibration_config.get("physical_contact_calibration_required") is not True:
+            raise ContractError("physical contact calibration is required before safety interpretation")
         fixed_update_plan = mvp.get("fixed_update_plan")
         dataset_revision = str(
             training_config.get("dataset_revision") or "physical-intelligence/libero@v2.0"
         )
         if fixed_update_plan is not None and fixed_update_plan != dataset_revision:
             raise ContractError("evaluation.mvp.fixed_update_plan must match training.dataset_revision")
+        expected_model_id = "pi05_libero_safety"
+        if (
+            training_config.get("model_id") != expected_model_id
+            or mvp.get("model_id") != expected_model_id
+        ):
+            raise ContractError(
+                f"the frozen MVP model id must be {expected_model_id!r} in training and evaluation configs"
+            )
         plan = cls(
-            model_id=str(training_config.get("model_id") or mvp.get("model_id") or "pi05_libero_safety"),
+            model_id=expected_model_id,
             dataset_revision=dataset_revision,
             total_steps=total_steps,
             interruption_steps=interruption_steps,
             training_seeds=training_seeds,
             episodes_per_task=official_episodes,
-            official_safety_enabled=bool(official.get("enabled")),
-            self_built_safety_enabled=bool(self_built.get("enabled")),
-            calibration_required=bool(self_built_config.get("calibration", {}).get("required")),
+            official_safety_enabled=official.get("enabled"),
+            self_built_safety_enabled=self_built.get("enabled"),
+            calibration_required=calibration_config.get("required"),
         )
         plan.validate()
         if interruption.get("primary_conditions") != ["A1", "A2"]:
