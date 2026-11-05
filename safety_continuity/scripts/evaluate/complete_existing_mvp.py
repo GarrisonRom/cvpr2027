@@ -888,7 +888,16 @@ def _format_report(
     safety_rows = [
         row for row in analysis.get("paired_safety_results", [])
         if row.get("row_type") == "training_seed"
+        and row.get("benchmark_id") == "libero_safety_self_built"
     ]
+    suite_names = {
+        "human_safety": "Human Safety",
+        "reasoning_safety": "Reasoning Safety",
+    }
+    capability_interval = next(
+        row for row in analysis.get("primary_capability_equivalence_rows", [])
+        if row.get("benchmark_id") == "libero10"
+    )
     lines = [
         "# π0.5 MVP Result",
         "",
@@ -914,27 +923,88 @@ def _format_report(
         "",
         "## Paired Safety Outcomes",
         "",
-        "| Suite | Training seed | Matched episodes | Known pairs | Unknown pairs | Risk difference |",
-        "|---|---:|---:|---:|---:|---:|",
+        "| Suite | Training seed | Matched | Known | Unknown | Optimizer reset unsafe/known | Full-state resume unsafe/known | Risk difference |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|",
     ])
     for row in safety_rows:
         effect = row.get("risk_difference")
         effect_text = f"{effect:.3f}" if effect is not None else "unavailable"
         lines.append(
-            f"| {row.get('suite_id')} | {row.get('training_seed')} | "
+            f"| {suite_names.get(row.get('suite_id'), row.get('suite_id'))} | {row.get('training_seed')} | "
             f"{row.get('matched_pair_count')} | {row.get('safety_eligible_pairs')} | "
-            f"{row.get('unknown_outcome_pairs')} | {effect_text} |"
+            f"{row.get('unknown_outcome_pairs')} | "
+            f"{row.get('unsafe_target_n')}/{row.get('safety_eligible_pairs')} | "
+            f"{row.get('unsafe_reference_n')}/{row.get('safety_eligible_pairs')} | {effect_text} |"
         )
+    reasoning_rows = [row for row in safety_rows if row.get("suite_id") == "reasoning_safety"]
+    human_rows = [row for row in safety_rows if row.get("suite_id") == "human_safety"]
+    reasoning_target_unsafe = sum(int(row.get("unsafe_target_n", 0)) for row in reasoning_rows)
+    reasoning_reference_unsafe = sum(int(row.get("unsafe_reference_n", 0)) for row in reasoning_rows)
+    reasoning_known = sum(int(row.get("safety_eligible_pairs", 0)) for row in reasoning_rows)
+    reasoning_unknown = sum(int(row.get("unknown_outcome_pairs", 0)) for row in reasoning_rows)
+    human_known = sum(int(row.get("safety_eligible_pairs", 0)) for row in human_rows)
+    human_unknown = sum(int(row.get("unknown_outcome_pairs", 0)) for row in human_rows)
+    capability_low = capability_interval.get("bootstrap_ci_low")
+    capability_high = capability_interval.get("bootstrap_ci_high")
+    reset_capability = capability_rates[CONDITION_LABELS["A2"]]
+    resume_capability = capability_rates[CONDITION_LABELS["A1"]]
     lines.extend([
         "",
         "## Safety Interpretation",
         "",
-        "The self-built safety suites use generated LIBERO-Safety states and rule-based labels. They are not official LIBERO-Safety results. The fixture check exercises rule logic only, and some source evaluation runs lack runtime provenance. These results can flag a candidate difference, but they do not establish that the policy is safe or that no safety regression exists.",
+        f"Reasoning Safety recorded {reasoning_target_unsafe}/{reasoning_known} known outcomes as unsafe for Optimizer-moment reset and {reasoning_reference_unsafe}/{reasoning_known} for Full-state resume; {reasoning_unknown} paired outcomes were unknown and excluded. The unsafe harmful-task completion occurred under both conditions, so this pilot found no incremental increase from the optimizer reset. It is still an unsafe behavior of the evaluated policy.",
+        f"Human Safety recorded no unsafe outcomes among {human_known} known paired cases; {human_unknown} additional paired cases were unknown.",
+        "These suites use generated LIBERO-Safety states and self-built rules. They are not official LIBERO-Safety results. The six fixtures test rule logic only, not contact extraction in the simulator, and some source evaluator runs lack runtime provenance.",
         "",
-        "Capability success rates are reported separately from safety labels. Low task success and any failed capability-equivalence interval prevent interpreting a safety difference as preserved capability.",
+        f"Capability equivalence failed: the 90% descriptive seed-cluster interval for Optimizer-moment reset minus Full-state resume was [{capability_low:.3f}, {capability_high:.3f}], outside the configured +/-0.05 margin. Success was {reset_capability['successes']}/{reset_capability['episodes']} after optimizer-moment reset and {resume_capability['successes']}/{resume_capability['episodes']} after full-state resume, so this pilot cannot establish that capability was preserved while measuring safety.",
+        "",
+        "The result does not prove safety or absence of other regressions. The pilot has only three training seeds, sparse known safety outcomes, no physical monitor calibration, and very low LIBERO-10 success.",
         "",
     ])
     return "\n".join(lines)
+
+
+def _write_report_only(
+    *,
+    args: argparse.Namespace,
+    tag: str,
+    analysis_id: str,
+) -> int:
+    final_root = args.payload_root / "runs" / f"finalize_{args.run_date:%Y%m%d}_{tag}"
+    analysis_path = args.payload_root / "runs" / analysis_id / "metrics" / "summary.json"
+    calibration_path = final_root / "metrics" / "monitor_rule_fixtures.json"
+    source_gate_path = final_root / "metrics" / "final_gate.json"
+    report_path = final_root / "metrics" / "result_report_reviewed.md"
+    gate_path = final_root / "metrics" / "final_gate_reviewed.json"
+    for required in (analysis_path, calibration_path, source_gate_path):
+        if not required.is_file():
+            raise ContractError(f"report-only source artifact is missing: {required}")
+    if report_path.exists() or gate_path.exists():
+        raise ContractError(f"reviewed report already exists under {final_root}")
+    analysis = _json(analysis_path)
+    calibration = _json(calibration_path)
+    source_gate = _json(source_gate_path)
+    capability_rates = _condition_capability_rates(analysis)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(
+        _format_report(
+            status=str(source_gate["status"]),
+            analysis=analysis,
+            calibration=calibration,
+            analysis_id=analysis_id,
+            capability_rates=capability_rates,
+        ),
+        encoding="utf-8",
+    )
+    reviewed_gate = {
+        **source_gate,
+        "report_revision": "paired_safety_counts_and_capability_interval.v2",
+        "reviewed_report": str(report_path.resolve()),
+        "source_analysis_summary": str(analysis_path.resolve()),
+    }
+    _write_json(gate_path, reviewed_gate)
+    print(json.dumps({"status": reviewed_gate["status"], "gate": str(gate_path), "report": str(report_path)}, indent=2))
+    return 0
 
 
 def _parse_args() -> argparse.Namespace:
@@ -964,6 +1034,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--analysis-id", default=None)
     parser.add_argument("--port", type=int, default=18000)
     parser.add_argument("--save-videos", action="store_true")
+    parser.add_argument("--report-only", action="store_true")
     return parser.parse_args()
 
 
@@ -986,6 +1057,8 @@ def main() -> int:
         f"{args.run_date:%Y%m%d}_analysis{tag.replace('_', '')}_pi05_primary_s00"
     )
     validate_run_id(analysis_id)
+    if args.report_only:
+        return _write_report_only(args=args, tag=tag, analysis_id=analysis_id)
     final_root = args.payload_root / "runs" / f"finalize_{args.run_date:%Y%m%d}_{tag}"
     gate_path = final_root / "metrics" / "final_gate.json"
     if gate_path.is_file():
