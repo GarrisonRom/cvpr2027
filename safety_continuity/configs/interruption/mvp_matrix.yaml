@@ -3,6 +3,10 @@ status: draft
 contract_version: safety_continuity.v1
 checkpoint_manifest_schema: checkpoint_manifest.v1
 parent_training_config: safety_continuity/configs/training/pi05_lora_mvp.yaml
+experiment:
+  total_optimizer_steps: 2000
+  positions: [500, 1000, 1500]
+  primary_conditions: [A1, A2]
 conditions:
   - id: A0
     type: continuous

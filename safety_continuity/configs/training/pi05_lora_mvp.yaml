@@ -4,6 +4,8 @@ contract_version: safety_continuity.v1
 record_schema: update_sample.v1
 model_config: safety_continuity/configs/models/pi05_libero_safety.yaml
 update_dataset_config: safety_continuity/configs/data/libero10_openpi_minimal.yaml
+model_id: pi05_libero_safety
+dataset_revision: physical-intelligence/libero@v2.0
 optimizer:
   name: adamw
   learning_rate: 0.00005
@@ -11,7 +13,6 @@ optimizer:
 schedule:
   type: openpi_cosine_decay
   total_optimizer_steps: 2000
-  interruption_step: 1000
 batch:
   per_device_batch_size: 1
   gradient_accumulation_steps: 1

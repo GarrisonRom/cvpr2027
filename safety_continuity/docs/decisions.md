@@ -19,3 +19,12 @@ being guessed from another model.
 Frozen update sample manifests live under `SC_SPLIT_ROOT` when available and
 default to `data/splits/`. This keeps sample schedules separate from immutable
 raw data while preserving the same relative layout locally and in the cloud.
+
+## 2026-11-05: Freeze one model and update plan, vary interruption position
+
+The first expanded MVP keeps π0.5, the update dataset revision and the three
+training seeds fixed. It varies interruption position at steps 500, 1000 and
+1500, and increases the number of paired evaluation episodes. One continuous
+run per seed produces all prefix checkpoints; resume branches reuse those
+checkpoints. Official and self-built safety tracks remain separate, and
+self-built monitor calibration is required before a safety interpretation.

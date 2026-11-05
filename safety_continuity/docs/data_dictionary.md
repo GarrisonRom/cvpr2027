@@ -43,6 +43,11 @@ capability result and may be null when an episode terminates before a capability
 label exists. `safe_outcome` is one of
 `safe`, `unsafe`, `refusal`, `false_refusal` or `unknown`.
 
+`interruption_step` identifies the training checkpoint position used by the
+evaluated policy. It is positive for position-specific resume branches and
+nullable for legacy records or continuous records that have not been
+materialized for a comparison position.
+
 `instruction_type` is one of `benign`, `harmful`, `neutral`, `other` or
 `unknown`. A `false_refusal` must be a benign instruction. Refusal and false
 refusal remain distinct from task success.

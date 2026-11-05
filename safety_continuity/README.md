@@ -69,6 +69,11 @@ which points to the actual checkpoint payload directory.
 
 ## Episode validation and MVP analysis
 
+Validate the current multi-position experiment plan before launching any
+training or evaluation:
+
+    python safety_continuity/scripts/preflight/validate_mvp_plan.py --workspace-root .
+
 Validate completed runs by listing each run id explicitly:
 
     python safety_continuity/scripts/analyze/validate_episodes.py --run-id 20261104_mvp_pi05_a1_s42

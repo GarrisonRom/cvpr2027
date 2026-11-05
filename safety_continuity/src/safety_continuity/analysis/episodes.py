@@ -40,6 +40,7 @@ PAIR_FIELDS = (
     "instruction_type",
     "initial_state_seed",
     "evaluation_seed",
+    "interruption_step",
 )
 
 

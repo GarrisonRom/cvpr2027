@@ -31,11 +31,12 @@ equivalence gate. The experiment is not designed to maximize task success.
 | Training code | OpenPI pinned external checkout |
 | Trainable parameters | native `action_out_proj` subset |
 | Update data | `physical-intelligence/libero@v2.0` |
-| Schedule | 2,000 samples, deterministic 10-episode task subset |
-| Interruption | optimizer step 1,000 |
+| Schedule | 2,000 samples, deterministic task subset, one frozen plan per seed |
+| Interruption positions | optimizer steps `500`, `1000`, `1500` |
 | Training seeds | `42`, `43`, `44` |
 | Capability suite | official LIBERO-10, 10 tasks |
-| Self-built safety suites | `human_safety`, `reasoning_safety`, L1 |
+| Safety tracks | official LIBERO-Safety plus self-built `human_safety` and `reasoning_safety`, L1 |
+| Episodes | 10 per task, condition and training seed on both safety tracks |
 | Pairing | same task, state seed, instruction and evaluator seed |
 | Primary optimizer condition | Optimizer-moment reset using the fixed implementation; runs before the fix are excluded |
 
@@ -47,13 +48,14 @@ part of the current primary seed set.
 `Interruption checkpoint` trains to the interruption point and is the branch
 origin.
 
-`Continuous training` runs for 2,000 steps without interruption. A checkpoint may be written at step
-1,000, but the process does not stop.
+`Continuous training` runs for 2,000 steps without interruption. One run per
+seed writes prefix checkpoints at all configured interruption positions.
 
-`Full-state resume` restores the complete checkpoint state after step 1,000 and executes the
-remaining 1,000 steps.
+`Full-state resume` restores the complete checkpoint state at one selected
+position and executes the remaining suffix.
 
-`Optimizer-moment reset` restores the same state but zeros only Adam `mu` and `nu` PyTree leaves.
+`Optimizer-moment reset` restores the same state at one selected position but
+zeros only Adam `mu` and `nu` PyTree leaves.
 Optimizer count, schedule/global step, RNG, batch cursor, normalization and
 gradient accumulation are preserved. Every optimizer-moment reset run writes
 `events/optimizer_moments_reset.json`.
@@ -64,6 +66,10 @@ optimizer-only effect.
 
 All branches consume the same ordered post-interruption schedule. The analysis
 requires both the frozen manifest hash and actual consumption trace.
+
+The continuous final checkpoint is reused as the control reference for every
+position. Prefix checkpoints are generated once per seed; the same prefix is
+not retrained independently for each position.
 
 ## Capability Track
 
@@ -195,3 +201,17 @@ retained as provenance identifiers. `needs_review` means evidence is
 incomplete or a possible safety signal was found; `no_threshold_signal` does
 not prove safety. The generated contact/action fixtures exercise rule logic
 only and do not validate contact extraction from the live simulator.
+
+## Plan Preflight
+
+Before launching GPU work, expand and validate the multi-position matrix:
+
+```bash
+python safety_continuity/scripts/preflight/validate_mvp_plan.py \\
+  --workspace-root .
+```
+
+The output distinguishes comparison rows from unique training invocations. A
+valid plan reports one continuous run per seed with all prefix checkpoint
+positions, then position-specific resume branches. It also requires both
+official and self-built safety tracks and a monitor calibration requirement.

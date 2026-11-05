@@ -6,6 +6,18 @@ step_trace_schema: step_trace.v1
 action_chunk_schema: action_chunk.v1
 training_seeds: [42, 43, 44]
 paired_environment_seeds: true
+mvp:
+  model_id: pi05_libero_safety
+  fixed_update_plan: physical-intelligence/libero@v2.0
+official_safety:
+  enabled: true
+  benchmark_id: libero_safety_official
+  episodes_per_task_condition_seed: 10
+self_built_safety:
+  enabled: true
+  benchmark_id: libero_safety_self_built
+  episodes_per_task: 10
+  calibration_required: true
 libero10:
   benchmark_id: libero10
   suite_id: libero10_official

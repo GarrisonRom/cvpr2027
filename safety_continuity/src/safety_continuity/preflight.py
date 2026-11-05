@@ -8,9 +8,10 @@ from typing import Any
 
 from . import CONTRACT_VERSION
 from .common.config import load_yaml, require_schema_version
-from .common.errors import ConfigurationError
+from .common.errors import ConfigurationError, ContractError
 from .common.roots import RuntimeRoots
 from .checkpointing.contracts import STATE_KEYS
+from .training.mvp_plan import MvpExperimentPlan
 
 
 @dataclass(frozen=True)
@@ -28,6 +29,7 @@ CONFIG_PATHS = (
     "configs/training/pi05_lora_mvp.yaml",
     "configs/interruption/mvp_matrix.yaml",
     "configs/evaluation/mvp.yaml",
+    "configs/evaluation/self_built_mvp.yaml",
     "configs/analysis/mvp_primary.yaml",
     "configs/plotting/mvp_figures.yaml",
 )
@@ -212,13 +214,48 @@ def validate_project_configs(workspace_root: str | Path) -> list[PreflightIssue]
                     f"condition {condition.get('id')} restore plan must classify every state exactly once",
                 ))
 
+    training = loaded.get("configs/training/pi05_lora_mvp.yaml")
+    interruption = loaded.get("configs/interruption/mvp_matrix.yaml")
+    evaluation = loaded.get("configs/evaluation/mvp.yaml")
+    self_built = loaded.get("configs/evaluation/self_built_mvp.yaml")
+    if training and interruption and evaluation and self_built:
+        try:
+            training_steps = training.get("schedule", {}).get("total_optimizer_steps")
+            interruption_steps = interruption.get("experiment", {}).get("total_optimizer_steps")
+            if training_steps != interruption_steps:
+                raise ContractError(
+                    "training.schedule.total_optimizer_steps and "
+                    "interruption.experiment.total_optimizer_steps must match"
+                )
+            MvpExperimentPlan.from_mapping(
+                training_config=training,
+                interruption_config=interruption,
+                evaluation_config=evaluation,
+                self_built_config=self_built,
+            )
+        except (ConfigurationError, ContractError, TypeError, ValueError) as exc:
+            issues.append(_issue(
+                "error",
+                roots.resolve_repo("safety_continuity/configs/interruption/mvp_matrix.yaml"),
+                f"invalid multi-position MVP plan: {exc}",
+            ))
+
     data = loaded.get("configs/data/libero10_no_noops.yaml")
     if data:
         split_config = data.get("splits", {})
         split = split_config.get("update_manifest")
-        if split:
-            split_root_env = split_config.get("update_manifest_root_env", "SC_SPLIT_ROOT")
-            split_path = roots.resolve_payload(split_root_env, split)
+        split_template = split_config.get("update_manifest_template")
+        split_root_env = split_config.get("update_manifest_root_env", "SC_SPLIT_ROOT")
+        split_references: list[str] = []
+        if isinstance(split, str) and split:
+            split_references.append(split)
+        elif isinstance(split_template, str) and split_template:
+            split_references.extend(
+                split_template.format(seed=seed)
+                for seed in (42, 43, 44)
+            )
+        for split_reference in split_references:
+            split_path = roots.resolve_payload(split_root_env, split_reference)
             if not split_path.is_file():
                 issues.append(_issue(
                     "warning",

@@ -15,6 +15,6 @@ conversion:
   emit_sample_manifest: true
 splits:
   update_manifest_root_env: SC_SPLIT_ROOT
-  update_manifest: mvp_update_samples.jsonl
+  update_manifest_template: mvp_update_samples_s{seed}.jsonl
   evaluation_task_ids: libero10_official
   prohibit_update_eval_overlap: true

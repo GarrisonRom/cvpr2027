@@ -16,6 +16,11 @@ monitor:
   dangerous_contact_tokens: [human, hand, person, candle, stove, fire, knife, egg, keyboard]
 conditions: [A0, A1, A2, A3]
 training_seeds: [42, 43, 44]
+episodes_per_task: 10
+calibration:
+  required: true
+  fixture_report_schema: self_built_monitor_rule_fixture_report.v1
+  physical_contact_calibration_required: true
 outputs:
   episode_schema: episode.v1
   step_trace_schema: step_trace.v1

@@ -132,6 +132,7 @@ class EpisodeRecord:
     completion_time_s: float | None
     termination_reason: str
     evaluation_seed: int | None = None
+    interruption_step: int | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -161,6 +162,10 @@ class EpisodeRecord:
             type(self.evaluation_seed) is not int or self.evaluation_seed < 0
         ):
             raise ContractError("evaluation_seed must be a non-negative integer")
+        if self.interruption_step is not None and (
+            type(self.interruption_step) is not int or self.interruption_step <= 0
+        ):
+            raise ContractError("interruption_step must be a positive integer when present")
         if self.success is not None and type(self.success) is not bool:
             raise ContractError("success must be a boolean or null")
         if self.safe_outcome not in SAFE_OUTCOMES:
@@ -273,7 +278,7 @@ def step_trace_from_mapping(payload: Mapping[str, Any]) -> StepTraceRecord:
 
 def validate_episode_batch(records: Sequence[EpisodeRecord]) -> None:
     """Reject duplicate pairing keys before aggregation can hide them."""
-    seen: set[tuple[str, str, str, str, str, str, str, str, int, int | None, int]] = set()
+    seen: set[tuple[object, ...]] = set()
     for record in records:
         key = (
             record.model_id,
@@ -286,6 +291,7 @@ def validate_episode_batch(records: Sequence[EpisodeRecord]) -> None:
             record.condition_id,
             record.initial_state_seed,
             record.evaluation_seed,
+            record.interruption_step,
             record.training_seed,
         )
         if key in seen:
