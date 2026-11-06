@@ -455,6 +455,7 @@ def run_matrix(args: Any) -> int:
         "SC_GPU_DRIVER": gpu[2].strip(),
         "SC_GIT_COMMIT": args.git_commit,
     })
+    os.environ.update(env)
     state_manifest_path = args.state_manifest
     if state_manifest_path is None:
         state_manifest_path = create_libero10_state_manifest(args.libero_root, args.output_root / "state_manifest",
