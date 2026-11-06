@@ -42,11 +42,18 @@ class CapabilityStateManifestTests(unittest.TestCase):
         from safety_continuity.evaluation.capability_matrix import _sha256_bytes
         for task, values in zip(tasks, arrays.values()):
             task["state_sha256"] = [_sha256_bytes(np.ascontiguousarray(value).tobytes()) for value in values]
+        source_code = root / "benchmark.py"
+        source_code.write_text("pinned benchmark source", encoding="utf-8")
+        source_hash = sha256_file(source_code)
+        source_files = {"benchmark.py": source_hash}
         payload = {
             "schema": "libero10_capability_state_manifest.v1",
             "benchmark_id": "libero10",
             "suite_id": "libero10_official",
-            "libero_classic_revision": "a" * 40,
+            "libero_classic_root": str(root),
+            "libero_classic_revision": None,
+            "libero_classic_source_sha256": sha256_payload(source_files),
+            "libero_classic_source_files": source_files,
             "evaluation_seed": 2048,
             "episodes_per_task": 10,
             "state_file": str(states_path),

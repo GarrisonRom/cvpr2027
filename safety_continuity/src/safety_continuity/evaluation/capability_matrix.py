@@ -5,6 +5,7 @@ import collections
 import datetime as dt
 import hashlib
 import importlib.util
+import inspect
 import json
 import math
 import os
@@ -50,12 +51,27 @@ def create_libero10_state_manifest(libero_root: Path, output_root: Path, evaluat
     suite = benchmark.get_benchmark_dict()["libero_10"]()
     if suite.n_tasks != 10:
         raise ContractError(f"expected 10 LIBERO-10 tasks, found {suite.n_tasks}")
-    libero_revision = subprocess.run(
-        ["git", "-C", str(libero_root), "rev-parse", "HEAD"],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.strip()
+    from libero.libero.envs import OffScreenRenderEnv
+
+    try:
+        libero_revision = subprocess.run(
+            ["git", "-C", str(libero_root), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    except subprocess.CalledProcessError:
+        libero_revision = None
+    source_files = [
+        libero_root / "setup.py",
+        libero_root / "libero" / "libero" / "benchmark" / "__init__.py",
+        libero_root / "libero" / "libero" / "benchmark" / "libero_suite_task_map.py",
+        Path(inspect.getsourcefile(OffScreenRenderEnv)).resolve(),
+    ]
+    source_hashes = {
+        str(path.resolve().relative_to(libero_root.resolve())): sha256_file(path)
+        for path in dict.fromkeys(source_files)
+    }
     states_dir = output_root / "states"
     states_dir.mkdir(parents=True, exist_ok=True)
     arrays: dict[str, Any] = {}
@@ -101,7 +117,10 @@ def create_libero10_state_manifest(libero_root: Path, output_root: Path, evaluat
         "schema": "libero10_capability_state_manifest.v1",
         "benchmark_id": "libero10",
         "suite_id": "libero10_official",
+        "libero_classic_root": str(libero_root.resolve()),
         "libero_classic_revision": libero_revision,
+        "libero_classic_source_sha256": sha256_payload(source_hashes),
+        "libero_classic_source_files": source_hashes,
         "evaluation_seed": evaluation_seed,
         "episodes_per_task": 10,
         "state_file": str(state_file.resolve()),
@@ -126,9 +145,20 @@ def validate_state_manifest(path: Path) -> dict[str, Any]:
     if (payload.get("benchmark_id") != "libero10" or payload.get("suite_id") != "libero10_official"
             or type(payload.get("evaluation_seed")) is not int or payload["evaluation_seed"] < 0
             or payload.get("episodes_per_task") != 10
-            or not isinstance(payload.get("libero_classic_revision"), str)
-            or not payload["libero_classic_revision"]):
+            or (payload.get("libero_classic_revision") is not None
+                and not isinstance(payload.get("libero_classic_revision"), str))
+            or not isinstance(payload.get("libero_classic_source_files"), dict)
+            or not payload["libero_classic_source_files"]
+            or payload.get("libero_classic_source_sha256")
+            != sha256_payload(payload["libero_classic_source_files"])):
         raise ContractError("invalid LIBERO-10 capability manifest identity or episode count")
+    source_root = Path(payload.get("libero_classic_root", ""))
+    if not source_root.is_dir():
+        raise ContractError("LIBERO-classic source root is unavailable")
+    for relative, expected_hash in payload["libero_classic_source_files"].items():
+        source = source_root / relative
+        if not source.is_file() or sha256_file(source) != expected_hash:
+            raise ContractError(f"LIBERO-classic source file is missing or changed: {source}")
     state_file = Path(payload["state_file"])
     if not state_file.is_file() or sha256_file(state_file) != payload["state_file_sha256"]:
         raise ContractError("LIBERO-10 frozen state payload is missing or corrupted")
