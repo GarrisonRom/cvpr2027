@@ -22,12 +22,16 @@ class CapabilityStateManifestTests(unittest.TestCase):
             arrays[key] = values
             bddl = root / f"task_{index:02d}.bddl"
             bddl.write_text(f"task {index}", encoding="utf-8")
+            source_states = root / f"task_{index:02d}.pruned_init"
+            source_states.write_text(f"source states {index}", encoding="utf-8")
             tasks.append({
                 "task_id": f"libero10_task_{index:02d}",
                 "task_index": index,
                 "task_name": f"task {index}",
                 "bddl_path": str(bddl),
                 "bddl_sha256": sha256_file(bddl),
+                "source_state_path": str(source_states),
+                "source_state_sha256": sha256_file(source_states),
                 "states_key": key,
                 "state_count": 10,
                 "state_shape": list(values.shape),

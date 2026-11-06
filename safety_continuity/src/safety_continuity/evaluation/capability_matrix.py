@@ -44,7 +44,7 @@ def create_libero10_state_manifest(libero_root: Path, output_root: Path, evaluat
     import numpy as np
 
     sys.path.insert(0, str(libero_root))
-    from libero.libero import benchmark, get_libero_path
+    from libero.libero import benchmark
 
     suite = benchmark.get_benchmark_dict()["libero_10"]()
     if suite.n_tasks != 10:
@@ -53,10 +53,17 @@ def create_libero10_state_manifest(libero_root: Path, output_root: Path, evaluat
     states_dir.mkdir(parents=True, exist_ok=True)
     arrays: dict[str, Any] = {}
     task_rows = []
-    bddl_root = Path(get_libero_path("bddl_files"))
     for task_index in range(suite.n_tasks):
         task = suite.get_task(task_index)
-        states = np.asarray(suite.get_task_init_states(task_index))
+        source_state_path = Path(
+            suite._get_task_file_path(task.level, task.level_id, "init_states", ".pruned_init")
+        )
+        if not source_state_path.is_file():
+            raise ContractError(f"missing official initial-state source for task {task_index}: {source_state_path}")
+        initial_states = suite.get_task_init_states(task.level, task.level_id)
+        if initial_states is None:
+            raise ContractError(f"benchmark has no official initial states for task {task_index}")
+        states = np.asarray(initial_states)
         if states.dtype.hasobject or states.ndim < 2 or len(states) < 10:
             raise ContractError(f"invalid official initial-state array for task {task_index}")
         states = np.ascontiguousarray(states[:10])
@@ -65,7 +72,9 @@ def create_libero10_state_manifest(libero_root: Path, output_root: Path, evaluat
         task_id = f"libero10_task_{task_index:02d}"
         key = f"task_{task_index:02d}"
         arrays[key] = states
-        bddl_path = bddl_root / task.problem_folder / task.bddl_file
+        bddl_path = Path(
+            suite._get_task_file_path(task.level, task.level_id, "bddl_files", ".bddl")
+        )
         if not bddl_path.is_file():
             raise ContractError(f"missing LIBERO-10 BDDL file: {bddl_path}")
         task_rows.append({
@@ -74,6 +83,8 @@ def create_libero10_state_manifest(libero_root: Path, output_root: Path, evaluat
             "task_name": str(task.language),
             "bddl_path": str(bddl_path.resolve()),
             "bddl_sha256": sha256_file(bddl_path),
+            "source_state_path": str(source_state_path.resolve()),
+            "source_state_sha256": sha256_file(source_state_path),
             "states_key": key,
             "state_count": 10,
             "state_shape": list(states.shape),
@@ -130,6 +141,10 @@ def validate_state_manifest(path: Path) -> dict[str, Any]:
             bddl = Path(task.get("bddl_path", ""))
             if not bddl.is_file() or sha256_file(bddl) != task.get("bddl_sha256"):
                 raise ContractError(f"LIBERO-10 BDDL source is missing or changed: {bddl}")
+            state_source = Path(task.get("source_state_path", ""))
+            if (not state_source.is_file()
+                    or sha256_file(state_source) != task.get("source_state_sha256")):
+                raise ContractError(f"LIBERO-10 source state file is missing or changed: {state_source}")
             if task["states_key"] not in saved_states:
                 raise ContractError(f"LIBERO-10 state array is missing: {task['states_key']}")
             states = saved_states[task["states_key"]]
