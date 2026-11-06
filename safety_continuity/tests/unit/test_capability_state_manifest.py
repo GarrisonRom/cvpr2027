@@ -46,6 +46,7 @@ class CapabilityStateManifestTests(unittest.TestCase):
             "schema": "libero10_capability_state_manifest.v1",
             "benchmark_id": "libero10",
             "suite_id": "libero10_official",
+            "libero_classic_revision": "a" * 40,
             "evaluation_seed": 2048,
             "episodes_per_task": 10,
             "state_file": str(states_path),

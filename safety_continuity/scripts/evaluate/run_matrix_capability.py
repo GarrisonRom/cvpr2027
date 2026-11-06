@@ -49,6 +49,7 @@ def main() -> int:
             "MUJOCO_GL": "egl",
             "LIBERO_CONFIG_PATH": str(args.libero_config),
             "PYTHONPATH": os.pathsep.join((str(args.libero_root), str(PROJECT_ROOT / "src"), str(args.openpi_root / "src"))),
+            "TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD": "1",
         })
         os.environ.update(env)
         state_manifest = create_libero10_state_manifest(

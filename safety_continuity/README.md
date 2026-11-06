@@ -49,9 +49,9 @@ seed. Official resource availability is audited separately. Its completion does
 not imply that official safety metrics or capability-equivalence analysis ran.
 
 `scripts/evaluate/run_matrix_capability.py --mode plan|smoke|run|unattended`
-runs LIBERO-10 success on the same 30 trained endpoints. It freezes the first
-ten benchmark initial states per task, hashes the state payload and BDDL files,
-and pairs inference RNG by task, episode and policy query. Unattended mode runs
+runs the LIBERO-classic LIBERO-10 task suite on the same 30 trained endpoints.
+It freezes the first ten benchmark initial states per task, hashes the state
+payload and BDDL files, and pairs inference RNG by task, episode and policy query. Unattended mode runs
 a short smoke before the full 3,000-episode capability matrix. This is the
 capability track; it does not supply official LIBERO-Safety labels.
 

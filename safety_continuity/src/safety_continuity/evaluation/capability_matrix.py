@@ -42,6 +42,7 @@ def _sha256_bytes(value: bytes) -> str:
 def create_libero10_state_manifest(libero_root: Path, output_root: Path, evaluation_seed: int) -> Path:
     """Freeze the first ten official LIBERO-10 states per task for all conditions."""
     import numpy as np
+    import torch
 
     sys.path.insert(0, str(libero_root))
     from libero.libero import benchmark
@@ -49,20 +50,24 @@ def create_libero10_state_manifest(libero_root: Path, output_root: Path, evaluat
     suite = benchmark.get_benchmark_dict()["libero_10"]()
     if suite.n_tasks != 10:
         raise ContractError(f"expected 10 LIBERO-10 tasks, found {suite.n_tasks}")
+    libero_revision = subprocess.run(
+        ["git", "-C", str(libero_root), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
     states_dir = output_root / "states"
     states_dir.mkdir(parents=True, exist_ok=True)
     arrays: dict[str, Any] = {}
     task_rows = []
+    initial_state_root = libero_root / "libero" / "libero" / "init_files"
+    bddl_root = libero_root / "libero" / "libero" / "bddl_files"
     for task_index in range(suite.n_tasks):
         task = suite.get_task(task_index)
-        source_state_path = Path(
-            suite._get_task_file_path(task.level, task.level_id, "init_states", ".pruned_init")
-        )
+        source_state_path = initial_state_root / task.problem_folder / task.init_states_file
         if not source_state_path.is_file():
             raise ContractError(f"missing official initial-state source for task {task_index}: {source_state_path}")
-        initial_states = suite.get_task_init_states(task.level, task.level_id)
-        if initial_states is None:
-            raise ContractError(f"benchmark has no official initial states for task {task_index}")
+        initial_states = torch.load(source_state_path, map_location="cpu", weights_only=False)
         states = np.asarray(initial_states)
         if states.dtype.hasobject or states.ndim < 2 or len(states) < 10:
             raise ContractError(f"invalid official initial-state array for task {task_index}")
@@ -72,9 +77,7 @@ def create_libero10_state_manifest(libero_root: Path, output_root: Path, evaluat
         task_id = f"libero10_task_{task_index:02d}"
         key = f"task_{task_index:02d}"
         arrays[key] = states
-        bddl_path = Path(
-            suite._get_task_file_path(task.level, task.level_id, "bddl_files", ".bddl")
-        )
+        bddl_path = bddl_root / task.problem_folder / task.bddl_file
         if not bddl_path.is_file():
             raise ContractError(f"missing LIBERO-10 BDDL file: {bddl_path}")
         task_rows.append({
@@ -98,6 +101,7 @@ def create_libero10_state_manifest(libero_root: Path, output_root: Path, evaluat
         "schema": "libero10_capability_state_manifest.v1",
         "benchmark_id": "libero10",
         "suite_id": "libero10_official",
+        "libero_classic_revision": libero_revision,
         "evaluation_seed": evaluation_seed,
         "episodes_per_task": 10,
         "state_file": str(state_file.resolve()),
@@ -121,7 +125,9 @@ def validate_state_manifest(path: Path) -> dict[str, Any]:
         raise ContractError("LIBERO-10 capability state manifest hash mismatch")
     if (payload.get("benchmark_id") != "libero10" or payload.get("suite_id") != "libero10_official"
             or type(payload.get("evaluation_seed")) is not int or payload["evaluation_seed"] < 0
-            or payload.get("episodes_per_task") != 10):
+            or payload.get("episodes_per_task") != 10
+            or not isinstance(payload.get("libero_classic_revision"), str)
+            or not payload["libero_classic_revision"]):
         raise ContractError("invalid LIBERO-10 capability manifest identity or episode count")
     state_file = Path(payload["state_file"])
     if not state_file.is_file() or sha256_file(state_file) != payload["state_file_sha256"]:
@@ -430,6 +436,8 @@ def wait_for_gpu(minimum_free_mib: int, status: dict[str, Any], status_path: Pat
 
 
 def run_matrix(args: Any) -> int:
+    if str(args.libero_root) not in sys.path:
+        sys.path.insert(0, str(args.libero_root))
     matrix = json.loads(args.training_matrix.read_text(encoding="utf-8"))
     runner_path = (
         Path(__file__).resolve().parents[3]
@@ -459,6 +467,7 @@ def run_matrix(args: Any) -> int:
         "XLA_PYTHON_CLIENT_PREALLOCATE": "false",
         "OPENPI_DATA_HOME": str(args.payload_root / "cache" / "openpi"),
         "HF_HOME": str(args.payload_root / "cache" / "huggingface"),
+        "TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD": "1",
     })
     gpu = subprocess.run(
         ["nvidia-smi", "--query-gpu=name,memory.total,driver_version", "--format=csv,noheader,nounits"],
