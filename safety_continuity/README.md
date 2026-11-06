@@ -51,9 +51,12 @@ not imply that official safety metrics or capability-equivalence analysis ran.
 `scripts/evaluate/run_matrix_capability.py --mode plan|smoke|run|unattended`
 runs the LIBERO-classic LIBERO-10 task suite on the same 30 trained endpoints.
 It freezes the first ten benchmark initial states per task, hashes the state
-payload and BDDL files, and pairs inference RNG by task, episode and policy query. Unattended mode runs
-a short smoke before the full 3,000-episode capability matrix. This is the
+payload and BDDL files, and pairs inference RNG by task, episode and policy
+query. Unattended mode runs a short smoke before the full 3,000-episode
+capability matrix. This is the
 capability track; it does not supply official LIBERO-Safety labels.
+Pass `--state-manifest <verified-manifest>` to reuse the same frozen states
+when restarting in a new output directory.
 
 Use `--mode unattended` to run the short GPU smoke and then the adapted safety
 matrix sequentially. A failed smoke stops the launcher. Each policy load waits

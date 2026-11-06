@@ -15,6 +15,7 @@ from safety_continuity.common.errors import ContractError
 from safety_continuity.evaluation.capability_matrix import (
     create_libero10_state_manifest,
     run_matrix,
+    validate_state_manifest,
     write_json,
 )
 
@@ -52,12 +53,16 @@ def main() -> int:
             "TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD": "1",
         })
         os.environ.update(env)
-        state_manifest = create_libero10_state_manifest(
+        state_manifest = args.state_manifest or create_libero10_state_manifest(
             args.libero_root, args.output_root / "state_manifest", args.evaluation_seed
         )
+        manifest = validate_state_manifest(state_manifest)
+        if manifest["evaluation_seed"] != args.evaluation_seed:
+            raise ContractError("state manifest evaluation seed differs from requested seed")
         status_path = args.output_root / "metadata" / "unattended.json"
         status = {"schema": "libero10_capability_unattended.v1", "status": "smoke_pending",
-                  "phases": [], "state_manifest": str(state_manifest)}
+                  "phases": [], "state_manifest": str(state_manifest),
+                  "state_manifest_sha256": manifest["manifest_sha256"]}
         write_json(status_path, status)
         for phase in ("smoke", "run"):
             phase_root = args.output_root / phase
