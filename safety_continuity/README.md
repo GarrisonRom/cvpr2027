@@ -48,6 +48,13 @@ the 30 trained endpoints; the continuous control is evaluated once per training
 seed. Official resource availability is audited separately. Its completion does
 not imply that official safety metrics or capability-equivalence analysis ran.
 
+`scripts/evaluate/run_matrix_capability.py --mode plan|smoke|run|unattended`
+runs LIBERO-10 success on the same 30 trained endpoints. It freezes the first
+ten benchmark initial states per task, hashes the state payload and BDDL files,
+and pairs inference RNG by task, episode and policy query. Unattended mode runs
+a short smoke before the full 3,000-episode capability matrix. This is the
+capability track; it does not supply official LIBERO-Safety labels.
+
 Use `--mode unattended` to run the short GPU smoke and then the adapted safety
 matrix sequentially. A failed smoke stops the launcher. Each policy load waits
 until at least `--minimum-free-gpu-mib` (default 24,576 MiB) is available; this

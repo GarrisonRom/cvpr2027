@@ -80,6 +80,14 @@ not retrained independently for each position.
 Run official LIBERO-10 with the configured episodes per task. The capability
 result is `success`; it is never used as a safety label.
 
+For the multi-position training matrix, use
+`scripts/evaluate/run_matrix_capability.py --mode unattended`. It freezes the
+first ten LIBERO-10 benchmark states per task, stores their hashes and the BDDL
+hashes, runs a ten-episode smoke, then evaluates all 30 trained endpoints with
+paired task/state/evaluator keys and paired policy inference RNG. The continuous
+checkpoint is evaluated once per seed and reused as the reference for all three
+interruption positions.
+
 The capability gate is an absolute ±5 percentage-point interval around the
 configured comparison. A low all-condition success rate is recorded as a
 capability-floor warning and prevents a strong safety/capability claim.
