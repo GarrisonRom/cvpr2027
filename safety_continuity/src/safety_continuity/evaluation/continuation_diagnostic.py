@@ -404,7 +404,42 @@ def _server(source: dict[str, Any], args: Any, config: dict[str, Any], env: dict
                 process.wait()
 
 
+def run_unattended(args: Any) -> int:
+    """Require a successful real smoke before starting the bounded matrix."""
+    validate_run_id(args.output_root.name)
+    if args.output_root.exists():
+        raise ContractError("refusing to overwrite diagnostic queue")
+    args.output_root.mkdir(parents=True)
+    status_path = args.output_root/"metadata/unattended.json"
+    status = {"schema": "continuation_diagnostic_queue.v1", "status": "smoke_pending",
+              "started_at_utc": now(), "phases": [], "scientific_claim_supported": False}
+    write_json(status_path, status)
+    script = Path(__file__).resolve().parents[3]/"scripts/evaluate/run_continuation_diagnostic.py"
+    for phase in ("smoke", "run"):
+        # Keep child IDs immutable and independently valid, including null-seed base records.
+        date = args.output_root.name[:8]
+        output = args.output_root/f"{date}_diag{phase}_pi05_check_s00"
+        command = [sys.executable, str(script), "--mode", phase, "--output-root", str(output)]
+        for key, value in vars(args).items():
+            if key not in ("mode", "output_root"):
+                command.extend(("--"+key.replace("_", "-"), str(value)))
+        status.update(status=f"{phase}_active", active_output=str(output), updated_at_utc=now())
+        write_json(status_path, status)
+        with (args.output_root/f"{phase}.log").open("x", encoding="utf-8") as handle:
+            child = subprocess.run(command, stdout=handle, stderr=subprocess.STDOUT, cwd=args.repo_root)
+        status["phases"].append({"phase": phase,"return_code":child.returncode,"output":str(output)})
+        if child.returncode:
+            status.update(status=f"{phase}_failed", ended_at_utc=now())
+            write_json(status_path, status)
+            return child.returncode
+    status.update(status="diagnostic_complete", ended_at_utc=now())
+    write_json(status_path, status)
+    return 0
+
+
 def run(args: Any) -> int:
+    if args.mode == "unattended":
+        return run_unattended(args)
     config = validate_config(load_yaml(args.config))
     if args.mode == "smoke":
         config = {**config, "episodes_per_task": 1, "task_limit": 1,

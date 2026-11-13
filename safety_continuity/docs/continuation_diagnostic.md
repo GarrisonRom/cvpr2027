@@ -37,6 +37,8 @@ weights-only 分支的 optimizer 计数不同，不能通过目录数字推断�
 
 入口：`scripts/evaluate/run_continuation_diagnostic.py --help`。
 先 `--mode plan`，再在全新的输出目录 `--mode smoke`，核实报告后再 `--mode run`。
+`--mode unattended` 在同一队列根下依次启动 smoke 与主矩阵，smoke 任一步失败即停止；
+两阶段各用独立 run ID，状态写入队列的 `metadata/unattended.json`。
 所有路径必须显式提供，不含凭据；云端运行 clean exact commit。
 正常 LIBERO 与 LIBERO-Safety 通过不同子进程和 PYTHONPATH 隔离。
 

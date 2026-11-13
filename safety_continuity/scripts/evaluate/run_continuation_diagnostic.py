@@ -19,7 +19,7 @@ def main() -> int:
         run_rollout_worker(json.loads(args.worker_request.read_text(encoding="utf-8")))
         return 0
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mode", choices=("plan", "smoke", "run"), default="plan")
+    parser.add_argument("--mode", choices=("plan", "smoke", "run", "unattended"), default="plan")
     parser.add_argument("--config", type=Path, default=PROJECT/"configs/evaluation/continuation_diagnostic.yaml")
     for name in ("training-matrix", "original-checkpoint", "payload-root", "openpi-root",
                  "capability-libero-root", "capability-libero-config", "safety-libero-root", "safety-libero-config",
