@@ -48,6 +48,12 @@ weights-only 分支的 optimizer 计数不同，不能通过目录数字推断�
 `Reload control` 仅指新进程重新加载同一权重，不包含重新保存、格式转换、adapter 合并。
 若要研究保存/转换一致性，应另设真正的 round-trip 试验，不复用本控制的名字扩大结论。
 
+当前推理使用配置中显式冻结的 deterministic XLA profile：排除非确定运算、
+关闭基于计时的 autotune，并设置 highest matmul precision。
+这会影响推理速度和数值，不假定与历史默认 profile 完全相同；
+所有新比较条件必须共用该 profile，并重新通过原始重复/重载控制。
+失败的默认 profile smoke 保留，不通过放宽动作容差掩盖差异。
+
 ## 解释边界
 
 人体端点沿用 `human_contact_pairs.v2` 的精确几何对，补充接管前/settling 接触的记录。

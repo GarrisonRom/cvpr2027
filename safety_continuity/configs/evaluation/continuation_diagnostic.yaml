@@ -18,3 +18,6 @@ gpu_wait_timeout_s: 1800
 server_start_timeout_s: 300
 port: 18220
 scope: historical_action_output_only_diagnostic
+inference_profile: deterministic_xla_v1
+xla_flags: --xla_gpu_deterministic_ops=true --xla_gpu_exclude_nondeterministic_ops=true --xla_gpu_autotune_level=0
+jax_matmul_precision: highest

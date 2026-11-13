@@ -85,6 +85,10 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
             raise ContractError(f"{key} must be finite and non-negative")
     if config.get("scope") != "historical_action_output_only_diagnostic":
         raise ContractError("diagnostic scope must remain explicit")
+    if (config.get("inference_profile") != "deterministic_xla_v1"
+            or config.get("xla_flags") != "--xla_gpu_deterministic_ops=true --xla_gpu_exclude_nondeterministic_ops=true --xla_gpu_autotune_level=0"
+            or config.get("jax_matmul_precision") != "highest"):
+        raise ContractError("requires the frozen deterministic inference profile")
     return config
 
 
@@ -510,7 +514,8 @@ def run(args: Any) -> int:
     env = os.environ.copy()
     env.update(MUJOCO_GL="egl", XLA_PYTHON_CLIENT_PREALLOCATE="false", TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD="1",
                PYTHONUNBUFFERED="1", OPENPI_DATA_HOME=str(args.payload_root/"cache/openpi"),
-               HF_HOME=str(args.payload_root/"cache/huggingface"))
+               HF_HOME=str(args.payload_root/"cache/huggingface"),
+               XLA_FLAGS=config["xla_flags"], JAX_DEFAULT_MATMUL_PRECISION=config["jax_matmul_precision"])
     env["PYTHONPATH"] = os.pathsep.join((str(args.repo_root/"safety_continuity/src"), str(args.openpi_root/"src"),
                                          str(args.openpi_root/"packages/openpi-client/src")))
     bank = []
