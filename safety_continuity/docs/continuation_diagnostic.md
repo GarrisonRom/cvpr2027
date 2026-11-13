@@ -53,6 +53,8 @@ weights-only 分支的 optimizer 计数不同，不能通过目录数字推断�
 这会影响推理速度和数值，不假定与历史默认 profile 完全相同；
 所有新比较条件必须共用该 profile，并重新通过原始重复/重载控制。
 失败的默认 profile smoke 保留，不通过放宽动作容差掩盖差异。
+模拟器子进程固定 `PYTHONHASHSEED=0`，每条 episode 同时固定 Python random 与 NumPy seed。
+逐步轨迹记录当前策略 query 的图像、本体输入和 seed/query 身份，便于定位首次分歧。
 
 ## 解释边界
 

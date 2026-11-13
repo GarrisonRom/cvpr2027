@@ -15,6 +15,7 @@ import json
 import math
 import os
 from pathlib import Path
+import random
 import subprocess
 import sys
 import time
@@ -89,6 +90,8 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
             or config.get("xla_flags") != "--xla_gpu_deterministic_ops=true --xla_gpu_exclude_nondeterministic_ops=true --xla_gpu_autotune_level=0"
             or config.get("jax_matmul_precision") != "highest"):
         raise ContractError("requires the frozen deterministic inference profile")
+    if type(config.get("python_hash_seed")) is not int or config["python_hash_seed"] != 0:
+        raise ContractError("requires fixed Python hash seed zero for simulator ordering")
     return config
 
 
@@ -197,6 +200,17 @@ def _observation(obs: dict[str, Any], prompt: str, seed: int, query: int) -> dic
             "prompt": prompt, "_sc_inference_seed": seed, "_sc_query_index": query}
 
 
+def observation_identity(element: dict[str, Any]) -> dict[str, Any]:
+    import numpy as np
+    result = {}
+    for key in ("observation/image", "observation/wrist_image", "observation/state"):
+        value = np.ascontiguousarray(element[key])
+        result[key] = {"shape":list(value.shape), "dtype":str(value.dtype),
+                       "sha256":hashlib.sha256(value.tobytes()).hexdigest()}
+    result.update(prompt=element["prompt"], seed=element["_sc_inference_seed"], query=element["_sc_query_index"])
+    return result
+
+
 def _task_states(request: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
     import numpy as np
     suite = request["suite"]
@@ -258,6 +272,7 @@ def run_rollout_worker(request: dict[str, Any]) -> None:
             for episode_index in range(request["episodes_per_task"]):
                 rng = config["evaluation_seed"] + task_index*10 + episode_index
                 np.random.seed(rng)
+                random.seed(rng)
                 env.seed(rng)
                 env.reset()
                 state = task["states"][episode_index]
@@ -277,6 +292,7 @@ def run_rollout_worker(request: dict[str, Any]) -> None:
                 for timestep in range(request["max_steps"]):
                     if not queued:
                         element = _observation(obs, task["task_name"], rng, query)
+                        input_identity = observation_identity(element)
                         actions = np.asarray(client.infer(element)["actions"])
                         compare_actions(actions, actions, atol=0, rtol=0)
                         if len(actions) < config["replan_steps"]:
@@ -301,6 +317,7 @@ def run_rollout_worker(request: dict[str, Any]) -> None:
                         first_contact = timestep
                     append_json(trace_file, {"episode_key": episode_key, "step": timestep,
                                               "action": action.tolist(), "contacts": contacts,
+                                              "policy_query_input": input_identity,
                                               "sim_state_sha256": hashlib.sha256(np.ascontiguousarray(
                                                   env.sim.get_state().flatten()).tobytes()).hexdigest()})
                     if done:
@@ -447,7 +464,7 @@ def run(args: Any) -> int:
     config = validate_config(load_yaml(args.config))
     if args.mode == "smoke":
         config = {**config, "episodes_per_task": 1, "task_limit": 1,
-                  "capability_max_steps": 20, "safety_max_steps": 20, "probe_query_indices": [0]}
+                  "capability_max_steps": 20, "safety_max_steps": 20, "probe_query_indices": [0,1]}
     matrix = json.loads(args.training_matrix.read_text(encoding="utf-8"))
     sources = select_sources(matrix, args.original_checkpoint, smoke=args.mode == "smoke")
     plan = {"schema": "continuation_diagnostic_plan.v1", "config": config, "sources": sources,
@@ -515,7 +532,8 @@ def run(args: Any) -> int:
     env.update(MUJOCO_GL="egl", XLA_PYTHON_CLIENT_PREALLOCATE="false", TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD="1",
                PYTHONUNBUFFERED="1", OPENPI_DATA_HOME=str(args.payload_root/"cache/openpi"),
                HF_HOME=str(args.payload_root/"cache/huggingface"),
-               XLA_FLAGS=config["xla_flags"], JAX_DEFAULT_MATMUL_PRECISION=config["jax_matmul_precision"])
+               XLA_FLAGS=config["xla_flags"], JAX_DEFAULT_MATMUL_PRECISION=config["jax_matmul_precision"],
+               PYTHONHASHSEED=str(config["python_hash_seed"]))
     env["PYTHONPATH"] = os.pathsep.join((str(args.repo_root/"safety_continuity/src"), str(args.openpi_root/"src"),
                                          str(args.openpi_root/"packages/openpi-client/src")))
     bank = []

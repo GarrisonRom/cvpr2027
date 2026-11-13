@@ -56,7 +56,7 @@ def repetition_audit(root: Path, candidate: str, repetition: str, config: dict[s
     import numpy as np
     result = {"source": candidate, "pass": repetition, "episodes": 0,
               "event_mismatches": 0, "trajectory_mismatches": 0, "state_hash_mismatches": 0,
-              "max_action_delta": 0.0}
+              "max_action_delta": 0.0, "input_identity_mismatches": 0, "first_divergences": []}
     for suite in ("capability", "human_safety", "reasoning_safety"):
         base_dir = root/"evaluations/original/primary"/suite
         test_dir = root/"evaluations"/candidate/repetition/suite
@@ -83,6 +83,15 @@ def repetition_audit(root: Path, candidate: str, repetition: str, config: dict[s
             if len(original_steps) != len(candidate_steps):
                 result["trajectory_mismatches"] += 1
             else:
+                for a_step,b_step in zip(original_steps,candidate_steps):
+                    identity_diff = a_step.get("policy_query_input") != b_step.get("policy_query_input")
+                    result["input_identity_mismatches"] += identity_diff
+                    action_diff = not np.allclose(a_step["action"],b_step["action"],atol=config["action_atol"],rtol=config["action_rtol"])
+                    if identity_diff or action_diff:
+                        result["first_divergences"].append({"episode_key":row["episode_key"],"step":a_step["step"],
+                            "input_differs":identity_diff,"original_input":a_step.get("policy_query_input"),
+                            "candidate_input":b_step.get("policy_query_input"),"action_exceeds_tolerance":action_diff})
+                        break
                 actions = compare_actions(np.asarray([r["action"] for r in original_steps]),
                                           np.asarray([r["action"] for r in candidate_steps]),
                                           atol=config["action_atol"], rtol=config["action_rtol"])
