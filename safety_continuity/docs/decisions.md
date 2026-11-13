@@ -1,5 +1,37 @@
 # Design Decisions
 
+## 2026-11-14: Diagnose retained weights before new adaptation training
+
+Run a bounded read-only diagnostic of existing original, continuous-prefix and
+resume-branch weights. Include same-input/RNG repetition, fresh-process reload
+and original-versus-final paired rollouts. The reload control does not perform
+save/export conversion. Separate initial human contacts from post-takeover events;
+do not interpret geometry contacts as injury or known task-specific prohibition.
+Use separate diagnostic records with null original training seed. This does not
+reactivate the shelved interruption study or establish the broader adaptation
+recipe. Smoke and main outputs use separate immutable runtime roots.
+
+## 2026-11-07: Separate benign adaptation from the shelved interruption pilot
+
+The active design asks whether benign task adaptation changes an already
+observable safety constraint behavior. It retains one model, one audited update
+plan and training seeds 42, 43 and 44. The interruption pilot is shelved without
+rewriting its protocols, metric versions or run records.
+
+`docs/benign_adaptation_experiment.md` owns the new proposed design. Before
+implementation, it requires original-checkpoint evaluation, reload parity,
+dataset audit, dynamic monitor calibration and a qualified capability/safety
+baseline. Existing action-output-only training does not stand in for a broader
+adaptation recipe. The main recipe must pass adapter compatibility and resource
+checks before launch.
+
+HazardArena already reports hazard amplification from safe-only VLA fine-tuning.
+The broad phenomenon cannot be claimed as new. Any new study must distinguish
+capability transfer from loss of an established safety behavior, or honestly
+report replication or absence of a repeatable effect. Discovery and confirmation
+states remain separate; no training or remote execution is authorized by this
+design document itself.
+
 ## 2026-11-02: Freeze cross-module contracts before native adapters
 
 The project starts with shared dataclasses and preflight validation because the

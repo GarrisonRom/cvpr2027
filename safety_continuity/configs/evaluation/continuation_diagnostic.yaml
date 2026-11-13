@@ -1,0 +1,20 @@
+schema: continuation_diagnostic_config.v1
+training_seeds: [42, 43, 44]
+continuous_optimizer_updates: [500, 1000, 1500, 2000]
+resume_interruption_step: 1000
+evaluation_seed: 2048
+episodes_per_task: 2
+task_limit: null
+replan_steps: 5
+settling_steps: 10
+capability_max_steps: 520
+safety_max_steps: 400
+probe_query_indices: [0, 10]
+probe_repeats: 3
+action_atol: 0.00001
+action_rtol: 0.00001
+minimum_free_gpu_mib: 24576
+gpu_wait_timeout_s: 1800
+server_start_timeout_s: 300
+port: 18220
+scope: historical_action_output_only_diagnostic

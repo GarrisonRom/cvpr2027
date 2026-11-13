@@ -1,5 +1,10 @@
 # π0.5 Interruption MVP
 
+> Status, 2026-11-07: this interruption research line is shelved. This document
+> preserves its historical design and does not establish a benign-adaptation
+> effect. The current proposed study is
+> [benign adaptation and safety retention](benign_adaptation_experiment.md).
+
 This document is the execution plan for the interruption pilot. Safety event
 definitions are maintained separately in
 [`safety_measurement_protocol.md`](safety_measurement_protocol.md).

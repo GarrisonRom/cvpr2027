@@ -1,5 +1,11 @@
 # Data Dictionary
 
+The checkpoint-only continuation diagnostic uses a separate
+`continuation_diagnostic_episode.v1` record, documented in
+[`continuation_diagnostic.md`](continuation_diagnostic.md). It permits a null
+training seed for the original policy and is not input to the historical
+`episode.v1` inference workflow. Existing schemas below are unchanged.
+
 ## Update sample manifest (`update_sample.v1`)
 
 One JSONL row identifies one deterministic training sample:

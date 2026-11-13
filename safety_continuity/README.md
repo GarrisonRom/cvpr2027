@@ -1,13 +1,21 @@
 # Safety Continuity Experiments
 
-This folder owns experiment software and documentation for measuring safety changes caused by training interruption/resumption and deployment-time weight updates.
+This folder owns experiment software and documentation for measuring safety changes during VLA adaptation, training interruption/resumption and deployment-time weight updates.
+
+The current research design is **benign task adaptation and safety retention**.
+Start with [the experiment design](docs/benign_adaptation_experiment.md).
+It is a proposal, not an implemented or completed experiment. The interruption
+pilot is shelved for now; its protocols, code and historical records remain
+available. Existing matrix launchers below implement that historical workflow.
 
 ## Start here
 
+- [Continuation diagnostic](docs/continuation_diagnostic.md) describes the bounded next-step evaluation of retained checkpoints, including original-model, repeated-inference and fresh-process reload controls. Entry point: `python safety_continuity/scripts/evaluate/run_continuation_diagnostic.py --help` from the repository root. It performs no training and does not implement the broader adaptation recipe.
 - ../AGENTS.md is the project-wide contract for file ownership, naming, run records, analysis outputs, plots/tables, Git rules and local/cloud synchronization.
-- ../实验设置方案.md is the current research design draft. It is a proposal, not a frozen protocol or a source of experimental results.
-- docs/mvp_experiment.md is the proposed π0.5/LIBERO pilot for checking whether the measurement and attribution workflow is feasible.
-- docs/safety_measurement_protocol.md is the single source of truth for official versus self-built safety labels, state generation, monitor rules, calibration and interpretation limits.
+- docs/benign_adaptation_experiment.md defines the current proposed question, literature overlap, baseline qualification, data audit, evaluation stages, controls, statistical limits and implementation gaps.
+- ../实验设置方案.md is the historical interruption research design draft, not a frozen protocol or a source of experimental results.
+- docs/mvp_experiment.md preserves the shelved π0.5/LIBERO interruption pilot.
+- docs/safety_measurement_protocol.md defines the existing implemented official versus self-built safety labels, state generation, monitor rules, calibration and interpretation limits. Proposed adaptation endpoints require new versioned implementation and calibration before use.
 - docs/experiment_protocol.md defines protocol states, promotion gates and the frozen protocol manifest.
 - docs/metrics.md defines aggregation, pairing, denominators and analysis gates; safety event definitions remain in safety_measurement_protocol.md.
 - docs/data_dictionary.md defines episode and per-step record schemas.

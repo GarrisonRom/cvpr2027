@@ -5,6 +5,8 @@ the checkout and are addressed only through environment roots.
 
 | Area | Current entry point | Responsibility |
 |---|---|---|
+| Current research design | `docs/benign_adaptation_experiment.md` | Proposed benign-adaptation study, literature overlap, staged evidence, resource estimates and implementation gaps; no new executable workflow yet |
+| Checkpoint diagnostic | `evaluation/continuation_diagnostic.py`, `analysis/continuation_diagnostic.py`, `scripts/evaluate/run_continuation_diagnostic.py` | Read-only historical checkpoints, repeated/reloaded policy controls, fixed-observation action changes and paired descriptive rollouts; separate diagnostic schema |
 | Config/path | `src/safety_continuity/common/` | YAML loading, hashes, run context, provenance, run ids and root-safe path resolution |
 | Data | `src/safety_continuity/data/` | Frozen sample references and episode/step record schemas |
 | Models | `src/safety_continuity/models/` | Registry, config-to-spec translation, native adapters and observation/action compatibility |

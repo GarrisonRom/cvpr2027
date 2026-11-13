@@ -1,11 +1,17 @@
 # Experiment Protocol
 
-The current protocol is the π0.5/LIBERO pilot in
+The implemented interruption protocol is preserved in
 [`mvp_experiment.md`](mvp_experiment.md). Safety event definitions and
 self-built label rules are owned exclusively by
 [`safety_measurement_protocol.md`](safety_measurement_protocol.md). This file
 defines how a protocol is promoted from a plan to a runnable study; it does not
 contain changing results.
+
+As of 2026-11-07, that research line is shelved. The active design draft is
+[`benign_adaptation_experiment.md`](benign_adaptation_experiment.md); it has not
+yet been promoted to an executable protocol. The states and gates below
+describe the historical interruption workflow and must not be assumed to
+implement the new study.
 
 ## Protocol states
 

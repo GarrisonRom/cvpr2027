@@ -55,6 +55,8 @@ The tracked project tree is planned as follows. Add files when their interfaces 
 - safety_continuity/environments/: pinned dependency specifications, separated when model stacks conflict.
 - safety_continuity/docs/experiment_protocol.md: frozen hypotheses, factors, inclusion rules and decision gates.
 - safety_continuity/docs/mvp_experiment.md: the minimal π0.5/LIBERO feasibility pilot, its controls, outputs and claim limits.
+- safety_continuity/docs/benign_adaptation_experiment.md: the current proposed benign-adaptation study, including baseline qualification, audited update data, physical/semantic endpoints, staged evaluation and implementation gaps; it does not redefine historical interruption metrics or establish new results.
+- safety_continuity/docs/continuation_diagnostic.md: bounded read-only diagnosis of historical checkpoints, repeat/reload controls, fixed-observation actions and paired descriptive rollouts; uses its own versioned records without changing historical episode schemas.
 - safety_continuity/docs/metrics.md: operational metric definitions, units, labels and aggregation.
 - safety_continuity/docs/data_dictionary.md: episode and per-step record schema.
 - safety_continuity/docs/cloud_setup.md: instance setup and storage mounts.
@@ -115,6 +117,7 @@ Runtime payloads are ignored by Git except .gitkeep markers and deliberately tra
 - `safety/contacts.py` owns the versioned human-contact geometry-pair endpoint; `evaluation/contact_calibration.py` and its thin evaluation script own independent live simulator extraction fixtures. Calibration evidence belongs under a new runtime output root and does not establish global safety.
 - `scripts/evaluate/run_matrix_evaluation.py` launches the adapted safety phase from explicit completed training jobs; `serve_paired_policy.py` adapts the inspected OpenPI JAX inference RNG. Its status must distinguish adapted rollout completion from official safety evaluation and capability equivalence.
 - evaluation owns benchmark protocols and episode records; adapters cannot silently change the benchmark's success or safety definitions.
+- `evaluation/continuation_diagnostic.py` owns checkpoint-only diagnosis and isolated simulator workers; `analysis/continuation_diagnostic.py` owns its paired descriptive results. Raw contact events do not establish injury or task-specific prohibited contact, and fresh-process reload is not a save/convert round trip.
 - probes owns activation extraction, data separation, frozen-probe evaluation and causal interventions.
 - mitigation owns release gates and safety-preservation methods. Gate thresholds use calibration data separate from final tests.
 - analysis owns validated aggregation and inference, not simulator control.
