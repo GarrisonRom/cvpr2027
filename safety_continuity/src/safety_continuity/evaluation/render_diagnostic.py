@@ -69,7 +69,53 @@ def _snapshot(env: Any, obs: dict[str, Any], task: dict[str, Any], seed: int, st
             "sim_state_sha256": hashlib.sha256(np.ascontiguousarray(after).tobytes()).hexdigest()}
 
 
-def run(source_run: Path, output: Path, *, steps: int, repeats: int, render_repeats: int) -> None:
+def _render_ablations(env: Any, output: Path) -> dict[str, Any]:
+    """Same held scene, one rendering setting changed at a time; diagnostic only."""
+    import mujoco
+    import numpy as np
+
+    sim = env.sim
+    context = sim._render_context_offscreen
+    original_flags = context.scn.flags.copy()
+    original_samples = sim.model.vis.quality.offsamples
+    original_state = sim.get_state().flatten().copy()
+    result = {"original_offsamples": int(original_samples), "profiles": {}}
+    arrays = {}
+    profiles = ("native_before", "no_shadows", "no_reflections", "no_shadows_or_reflections",
+                "native_recreated_context", "no_multisampling", "native_after")
+    try:
+        for profile in profiles:
+            context.scn.flags[:] = original_flags
+            if profile in ("no_shadows", "no_shadows_or_reflections"):
+                context.scn.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = 0
+            if profile in ("no_reflections", "no_shadows_or_reflections"):
+                context.scn.flags[mujoco.mjtRndFlag.mjRND_REFLECTION] = 0
+            if profile in ("native_recreated_context", "no_multisampling", "native_after"):
+                sim.model.vis.quality.offsamples = 0 if profile == "no_multisampling" else original_samples
+                context.con.free()
+                context._set_mujoco_context_and_buffers()
+            images = [sim.render(camera_name="robot0_eye_in_hand", width=256, height=256).copy()
+                      for _ in range(64)]
+            differences = [array_difference(images[0], image) for image in images[1:]]
+            result["profiles"][profile] = {"varying_pairs": sum(not d["exact_equal"] for d in differences),
+                                           "pairs": len(differences), "differences": differences}
+            arrays[profile] = np.stack(images)
+    finally:
+        context.scn.flags[:] = original_flags
+        sim.model.vis.quality.offsamples = original_samples
+        context.con.free()
+        context._set_mujoco_context_and_buffers()
+    if not np.array_equal(original_state, sim.get_state().flatten()):
+        raise ContractError("render ablation changed simulator state")
+    file = output/"render_ablations.npz"
+    np.savez_compressed(file, **arrays)
+    result.update(file=str(file), sha256=sha256_file(file), physics_state_unchanged=True)
+    write_json(output/"render_ablations.json", result)
+    return result
+
+
+def run(source_run: Path, output: Path, *, steps: int, repeats: int, render_repeats: int,
+        render_ablations: bool = False) -> None:
     import numpy as np
     from libero.libero.envs import OffScreenRenderEnv
 
@@ -97,6 +143,7 @@ def run(source_run: Path, output: Path, *, steps: int, repeats: int, render_repe
                 "source_run": str(source_run), "source_request_sha256": sha256_file(request_file),
                 "source_trace_sha256": sha256_file(trace_file), "steps": steps, "repeats": repeats,
                 "render_repeats": render_repeats, "policy_inference": False, "new_training": False,
+                "render_ablations": render_ablations,
                 "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
                 "status": "running"}
     write_json(output/"metadata.json", metadata)
@@ -125,6 +172,8 @@ def run(source_run: Path, output: Path, *, steps: int, repeats: int, render_repe
                             frame["reference_sim_state_match"] = (None if index == 0 else
                                 frame["sim_state_sha256"] == rows[index-1]["sim_state_sha256"])
                             frames.append(frame)
+                        if render_ablations and repeat == 0 and episode_index == 0 and index == 5:
+                            _render_ablations(env, output)
                         if index < steps:
                             obs, _, _, _ = env.step(rows[index]["action"])
                     records.append({"repeat": repeat, "episode": episode_index, "frames": frames})

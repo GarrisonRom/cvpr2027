@@ -14,6 +14,8 @@ if __name__ == "__main__":
     parser.add_argument("--steps", type=int, default=20)
     parser.add_argument("--repeats", type=int, default=4)
     parser.add_argument("--render-repeats", type=int, default=16)
+    parser.add_argument("--render-ablations", action="store_true",
+                        help="At held step 5, compare shadow/reflection/MSAA settings with native controls")
     args = parser.parse_args()
     run(args.source_run.resolve(), args.output_root.resolve(), steps=args.steps,
-        repeats=args.repeats, render_repeats=args.render_repeats)
+        repeats=args.repeats, render_repeats=args.render_repeats, render_ablations=args.render_ablations)
