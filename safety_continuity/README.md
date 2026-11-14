@@ -11,6 +11,7 @@ available. Existing matrix launchers below implement that historical workflow.
 ## Start here
 
 - [Continuation diagnostic](docs/continuation_diagnostic.md) describes the bounded next-step evaluation of retained checkpoints, including original-model, repeated-inference and fresh-process reload controls. Entry point: `python safety_continuity/scripts/evaluate/run_continuation_diagnostic.py --help` from the repository root. It performs no training and does not implement the broader adaptation recipe.
+- Camera repeatability diagnosis: `python safety_continuity/scripts/evaluate/diagnose_camera_replay.py --help` replays explicit saved actions, records raw/processed frames and tests held-scene rendering. Optional MSAA intervention is a separate visual protocol; it is not silently applied to existing evaluation launchers.
 - ../AGENTS.md is the project-wide contract for file ownership, naming, run records, analysis outputs, plots/tables, Git rules and local/cloud synchronization.
 - docs/benign_adaptation_experiment.md defines the current proposed question, literature overlap, baseline qualification, data audit, evaluation stages, controls, statistical limits and implementation gaps.
 - ../实验设置方案.md is the historical interruption research design draft, not a frozen protocol or a source of experimental results.
