@@ -69,6 +69,25 @@ def _snapshot(env: Any, obs: dict[str, Any], task: dict[str, Any], seed: int, st
             "sim_state_sha256": hashlib.sha256(np.ascontiguousarray(after).tobytes()).hexdigest()}
 
 
+def configure_replay_renderer(env: Any, profile: str) -> dict[str, Any]:
+    """Apply an explicit visual intervention after each hard reset, before state load."""
+    if profile not in ("native", "egl_no_msaa_v1"):
+        raise ContractError("unsupported replay renderer profile")
+    context = env.sim._render_context_offscreen
+    requested_before = int(env.sim.model.vis.quality.offsamples)
+    actual_before = int(context.con.offSamples)
+    if profile == "egl_no_msaa_v1":
+        # The inspected vendored binding uses this exact method to recreate an
+        # offscreen buffer after resize. Rebuild without advancing physics.
+        env.sim.model.vis.quality.offsamples = 0
+        context.con.free()
+        context._set_mujoco_context_and_buffers()
+        if int(context.con.offSamples) != 0:
+            raise ContractError("renderer did not disable multisampling")
+    return {"profile": profile, "requested_samples_before": requested_before,
+            "actual_samples_before": actual_before, "actual_samples_after": int(context.con.offSamples)}
+
+
 def _render_ablations(env: Any, output: Path) -> dict[str, Any]:
     """Same held scene, one rendering setting changed at a time; diagnostic only."""
     import mujoco
@@ -115,12 +134,14 @@ def _render_ablations(env: Any, output: Path) -> dict[str, Any]:
 
 
 def run(source_run: Path, output: Path, *, steps: int, repeats: int, render_repeats: int,
-        render_ablations: bool = False) -> None:
+        render_ablations: bool = False, render_profile: str = "native") -> None:
     import numpy as np
     from libero.libero.envs import OffScreenRenderEnv
 
     if not 5 <= steps <= 400 or not 2 <= repeats <= 10 or not 2 <= render_repeats <= 64:
         raise ContractError("requires steps 5..400 and repeats 2..10, render repeats 2..64")
+    if render_profile not in ("native", "egl_no_msaa_v1") or (render_ablations and render_profile != "native"):
+        raise ContractError("render ablations require native baseline; unsupported profile")
     request_file = source_run / "metadata/requests/original_primary_reasoning_safety.json"
     request = json.loads(request_file.read_text(encoding="utf-8"))
     tasks, _ = _task_states(request)
@@ -144,6 +165,7 @@ def run(source_run: Path, output: Path, *, steps: int, repeats: int, render_repe
                 "source_trace_sha256": sha256_file(trace_file), "steps": steps, "repeats": repeats,
                 "render_repeats": render_repeats, "policy_inference": False, "new_training": False,
                 "render_ablations": render_ablations,
+                "render_profile": render_profile,
                 "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
                 "status": "running"}
     write_json(output/"metadata.json", metadata)
@@ -158,6 +180,7 @@ def run(source_run: Path, output: Path, *, steps: int, repeats: int, render_repe
                     random.seed(seed)
                     env.seed(seed)
                     env.reset()
+                    renderer = configure_replay_renderer(env, render_profile)
                     obs = env.set_init_state(task["states"][episode_index])
                     for _ in range(request["config"]["settling_steps"]):
                         obs, _, _, _ = env.step([0.0]*6+[-1.0])
@@ -176,7 +199,7 @@ def run(source_run: Path, output: Path, *, steps: int, repeats: int, render_repe
                             _render_ablations(env, output)
                         if index < steps:
                             obs, _, _, _ = env.step(rows[index]["action"])
-                    records.append({"repeat": repeat, "episode": episode_index, "frames": frames})
+                    records.append({"repeat": repeat, "episode": episode_index, "renderer": renderer, "frames": frames})
                     write_json(output/"records.json", records)
                     print(json.dumps({"repeat": repeat, "episode": episode_index, "complete": True}), flush=True)
             finally:
@@ -188,8 +211,11 @@ def run(source_run: Path, output: Path, *, steps: int, repeats: int, render_repe
             reference = next(r for r in records if r["repeat"] == 0 and r["episode"] == record["episode"])
             for left, right in zip(reference["frames"], record["frames"], strict=True):
                 with np.load(left["file"], allow_pickle=False) as a, np.load(right["file"], allow_pickle=False) as b:
-                    differences = {key: array_difference(a[key], b[key]) for key in a.files
-                                   if not array_difference(a[key], b[key])["exact_equal"]}
+                    differences = {}
+                    for key in a.files:
+                        difference = array_difference(a[key], b[key])
+                        if not difference["exact_equal"]:
+                            differences[key] = difference
                 comparisons.append({"repeat": record["repeat"], "episode": record["episode"], "step": right["step"],
                                     "differences": differences, "sensors_equal": left["sensors"] == right["sensors"]})
         write_json(output/"comparisons.json", comparisons)
